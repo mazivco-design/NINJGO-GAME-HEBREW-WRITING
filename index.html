@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>משחק קריאה וכתיבה - נועם</title>
-    <link href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.cdnfonts.com/css/guttman-yad" rel="stylesheet">
     <style>
         :root {
             --bg-color: #f4f7f6;
@@ -34,6 +34,7 @@
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
         }
 
         .top-nav {
@@ -60,7 +61,7 @@
         .btn-action { background-color: var(--secondary-color); color: #fff; }
         .btn-success { background-color: var(--primary-color); color: #fff; }
         .btn-danger { background-color: #f44336; color: #fff; }
-        .btn-small { padding: 6px 12px; font-size: 14px; margin-left: 5px; }
+        .btn-small { padding: 6px 10px; font-size: 14px; margin-left: 3px; }
         .btn-large { width: 100%; padding: 15px; font-size: 22px; margin-top: 15px; }
 
         .video-wrapper {
@@ -71,10 +72,33 @@
             border-radius: 8px;
             overflow: hidden;
             margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .game-mode .video-wrapper {
+            width: 65%;
+            margin: 0 auto 15px auto;
         }
         
         #youtubePlayer, #localPlayer { width: 100%; height: 100%; display: none; }
         
+        /* פס שחור להסתרת כתוביות צרובות וסרגל יוטיוב */
+        #subtitleBlocker {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 18%; /* מכסה את ה-18% התחתונים של הסרטון */
+            background-color: #000; /* צבע שחור שמתמזג עם הנגן */
+            z-index: 5;
+            display: none; /* מוסתר כברירת מחדל במצב עריכה */
+        }
+        
+        /* מציג את הפס השחור רק במצב משחק */
+        .game-mode #subtitleBlocker {
+            display: block;
+        }
+
         #audioOnlyOverlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -105,7 +129,6 @@
             border-radius: 6px; margin-top: 5px; font-family: inherit;
         }
 
-        /* תיבת הייחוס (המשפט הנכון) שתוצג מעל המחברת */
         #referenceBox {
             background: #e3f2fd;
             border: 2px dashed var(--secondary-color);
@@ -113,11 +136,11 @@
             border-radius: 8px;
             text-align: center;
             margin-top: 15px;
-            display: none; /* מוסתר כברירת מחדל */
+            display: none;
         }
         
         #referenceTextDisplay {
-            font-family: 'Guttman Yad', 'Amatic SC', cursive;
+            font-family: 'Guttman Yad', cursive;
             font-size: 45px;
             color: #000;
         }
@@ -132,7 +155,7 @@
         }
 
         .notebook-text {
-            font-family: 'Guttman Yad', 'Amatic SC', cursive;
+            font-family: 'Guttman Yad', cursive;
             font-size: 95px;
             line-height: 1;
             text-align: center;
@@ -160,6 +183,14 @@
 
         .hidden { display: none !important; }
         .time-display { font-family: monospace; font-size: 18px; font-weight: bold; }
+        
+        .time-controls-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
     </style>
     <script src="https://www.youtube.com/iframe_api"></script>
 </head>
@@ -173,19 +204,23 @@
 
     <!-- מצב עריכה -->
     <div id="editPanel" class="panel active-panel">
+        
         <div class="control-group" style="background-color: #e3f2fd;">
-            <h3>הפרויקטים שלי</h3>
-            <select id="projectSelect" onchange="loadSelectedProject()">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0;">הפרויקטים שלי</h3>
+                <button class="btn-nav" onclick="startNewProject()" style="background-color: #fff; border: 2px solid #ffb300;">➕ פרויקט חדש ונקי</button>
+            </div>
+            <select id="projectSelect" onchange="loadSelectedProject()" style="margin-top: 15px;">
                 <option value="">-- בחר פרויקט קיים --</option>
             </select>
         </div>
 
         <div class="control-group">
-            <h3>1. הוספת וידאו חדש (פרויקט חדש)</h3>
+            <h3>1. טעינת סרטון לעריכה</h3>
             <label>הדבק קישור יוטיוב:</label>
             <div style="display:flex; gap:10px; margin-bottom:15px;">
                 <input type="text" id="ytInput" placeholder="https://www.youtube.com/watch?v=...">
-                <button class="btn-action" onclick="loadVideo('youtube')">טען פרויקט חדש</button>
+                <button class="btn-action" onclick="loadVideo('youtube')">טען סרטון</button>
             </div>
         </div>
 
@@ -193,6 +228,12 @@
             <div id="youtubePlayer"></div>
             <video id="localPlayer" controls></video>
             <div id="audioOnlyOverlay">🔊 משמיע סאונד בלבד...</div>
+            <div id="subtitleBlocker"></div> <!-- פס הסתרת הכתוביות -->
+        </div>
+        
+        <div style="text-align: center; margin-bottom: 15px;">
+            <button class="btn-nav" onclick="seekRelative(-5)">⏪ אחורה 5 שניות</button>
+            <button class="btn-nav" onclick="seekRelative(5)">קדימה 5 שניות ⏩</button>
         </div>
 
         <div class="control-group">
@@ -202,17 +243,22 @@
 
         <div class="control-group">
             <h3>3. הגדרות סצנה</h3>
-            <div style="display:flex; align-items:center; gap:10px; margin-bottom: 10px;">
+            
+            <div class="time-controls-row">
                 <button class="btn-action" onclick="markTime('start')">סמן In</button>
+                <button class="btn-small" onclick="adjustInTime(-1)">-1ש'</button>
+                <button class="btn-small" onclick="adjustInTime(1)">+1ש'</button>
                 <span class="time-display" id="lblStart">0:00</span>
+                
                 <span style="margin: 0 10px;">|</span>
+                
                 <button class="btn-action" onclick="markTime('end')">סמן Out</button>
-                <span class="time-display" id="lblEnd">0:00</span>
                 <button class="btn-small" onclick="adjustOutTime(-1)">-1ש'</button>
                 <button class="btn-small" onclick="adjustOutTime(1)">+1ש'</button>
+                <span class="time-display" id="lblEnd">0:00</span>
             </div>
             
-            <button class="btn-nav" onclick="previewSelectedClip()" style="margin-bottom: 15px;">▶️ נגן קטע נבחר</button>
+            <button class="btn-nav" onclick="previewSelectedClip()" style="margin-bottom: 15px; width: 100%;">▶️ נגן קטע נבחר לבדיקה</button>
             
             <input type="hidden" id="editSceneId" value="">
             <label>משפט לסצנה:</label>
@@ -237,13 +283,13 @@
     <!-- מצב משחק -->
     <div id="gamePanel" class="panel">
         <div class="progress-bar" id="gameProgress">סצנה 1 מתוך 5</div>
+        
         <div id="gameVideoPlaceholder"></div>
         
-        <div id="gameControls" style="text-align:center; margin-top:15px;">
+        <div id="gameControls" style="text-align:center; margin-top:10px;">
             <button class="btn-action" id="btnPlayAudio" onclick="playAudioOnly()">השמע משפט 🔊</button>
         </div>
 
-        <!-- תיבת המשפט הנכון להשוואה (מופיעה רק בסיום כתיבה חופשית) -->
         <div id="referenceBox">
             <div>המשפט הנכון:</div>
             <div id="referenceTextDisplay"></div>
@@ -282,6 +328,7 @@
     const overlay = document.getElementById('audioOnlyOverlay');
     const gamePlaceholder = document.getElementById('gameVideoPlaceholder');
     const editVideoWrapper = document.querySelector('.video-wrapper');
+    const appContainer = document.getElementById('app-container');
     const canvas = document.getElementById('drawingCanvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
@@ -300,21 +347,59 @@
 
     function onYouTubeIframeAPIReady() { ytReady = true; populateProjectsList(); }
 
+    function startNewProject() {
+        currentVideoId = null;
+        videoType = null;
+        scenes = [];
+        tempStart = 0;
+        tempEnd = 0;
+        
+        document.getElementById('projectSelect').value = '';
+        document.getElementById('ytInput').value = '';
+        document.getElementById('sceneText').value = '';
+        document.getElementById('transcriptArea').value = '';
+        document.getElementById('editSceneId').value = '';
+        
+        updateTimeDisplay();
+        renderScenes();
+        
+        ytElement.style.display = 'none';
+        localElement.style.display = 'none';
+        
+        if (ytPlayer && typeof ytPlayer.stopVideo === 'function') {
+            ytPlayer.stopVideo();
+        }
+        
+        localElement.pause();
+        localElement.src = '';
+    }
+
     function populateProjectsList() {
         const allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
         const select = document.getElementById('projectSelect');
+        const currentVal = select.value;
+        
         select.innerHTML = '<option value="">-- בחר פרויקט קיים --</option>';
         Object.keys(allData).forEach(key => {
-            const option = document.createElement('option');
-            option.value = key;
-            option.innerText = "פרויקט: " + key;
-            select.appendChild(option);
+            if (allData[key] && allData[key].length > 0) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.innerText = "פרויקט: " + key;
+                select.appendChild(option);
+            }
         });
+        
+        if (currentVal && allData[currentVal] && allData[currentVal].length > 0) {
+            select.value = currentVal;
+        }
     }
 
     function loadSelectedProject() {
         const selected = document.getElementById('projectSelect').value;
-        if (!selected) return;
+        if (!selected) {
+            startNewProject();
+            return;
+        }
         currentVideoId = selected;
         videoType = selected.startsWith("YT_") ? 'youtube' : 'local';
         
@@ -326,7 +411,13 @@
             else if (ytReady) {
                 ytPlayer = new YT.Player('youtubePlayer', {
                     videoId: vid,
-                    playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 },
+                    playerVars: { 
+                        'playsinline': 1, 
+                        'controls': 1, 
+                        'modestbranding': 1, 
+                        'rel': 0,
+                        'hl': 'he' // שפה
+                    },
                     events: { 'onStateChange': onPlayerStateChange }
                 });
             }
@@ -352,13 +443,20 @@
             else if (ytReady) {
                 ytPlayer = new YT.Player('youtubePlayer', {
                     videoId: vid,
-                    playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 },
+                    playerVars: { 
+                        'playsinline': 1, 
+                        'controls': 1, 
+                        'modestbranding': 1, 
+                        'rel': 0,
+                        'hl': 'he'
+                    },
                     events: { 'onStateChange': onPlayerStateChange }
                 });
             }
         }
         loadScenesFromStorage();
         populateProjectsList();
+        document.getElementById('projectSelect').value = currentVideoId;
     }
 
     function getCurrentTime() {
@@ -370,6 +468,11 @@
     function seekTo(time) {
         if (videoType === 'youtube' && ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(time, true);
         if (videoType === 'local') localElement.currentTime = time;
+    }
+
+    function seekRelative(seconds) {
+        const newTime = Math.max(0, getCurrentTime() + seconds);
+        seekTo(newTime);
     }
 
     function playVideo() {
@@ -393,9 +496,16 @@
         updateTimeDisplay();
     }
 
+    function adjustInTime(seconds) {
+        tempStart += seconds;
+        if (tempStart < 0) tempStart = 0;
+        if (tempStart >= tempEnd) tempEnd = tempStart + 1;
+        updateTimeDisplay();
+    }
+
     function adjustOutTime(seconds) {
         tempEnd += seconds;
-        if (tempEnd < tempStart) tempEnd = tempStart;
+        if (tempEnd <= tempStart) tempEnd = tempStart + 1;
         updateTimeDisplay();
     }
 
@@ -469,6 +579,13 @@
         if(confirm("האם אתה בטוח שברצונך למחוק סצנה זו?")) {
             scenes = scenes.filter(x => x.id !== id);
             saveData();
+            
+            if (scenes.length === 0) {
+                let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
+                delete allData[currentVideoId];
+                localStorage.setItem('ninjagoData', JSON.stringify(allData));
+                startNewProject();
+            }
         }
     }
 
@@ -494,6 +611,9 @@
             currentMode = 'game';
             document.getElementById('editPanel').classList.remove('active-panel');
             document.getElementById('gamePanel').classList.add('active-panel');
+            
+            appContainer.classList.add('game-mode');
+            
             document.getElementById('mainTitle').innerText = "משחק קריאה";
             document.getElementById('modeToggleBtn').innerText = "חזור לעריכה ⚙️";
             gamePlaceholder.appendChild(editVideoWrapper);
@@ -502,6 +622,9 @@
             currentMode = 'edit';
             document.getElementById('gamePanel').classList.remove('active-panel');
             document.getElementById('editPanel').classList.add('active-panel');
+            
+            appContainer.classList.remove('game-mode');
+            
             document.getElementById('mainTitle').innerText = "מצב עריכה";
             document.getElementById('modeToggleBtn').innerText = "מעבר למשחק 🎮";
             document.getElementById('editPanel').insertBefore(editVideoWrapper, document.getElementById('editPanel').children[2]);
@@ -527,7 +650,6 @@
         const scene = activeScenes[currentGameIndex];
         document.getElementById('gameProgress').innerText = `סצנה ${currentGameIndex + 1} מתוך ${activeScenes.length}`;
         
-        // איפוס כפתורים ואזורים
         document.getElementById('btnNextScene').classList.add('hidden');
         document.getElementById('btnPlayAudio').classList.remove('hidden');
         document.getElementById('btnClearCanvas').classList.remove('hidden');
@@ -579,13 +701,11 @@
         const btnDone = document.getElementById('btnDoneWriting');
 
         if (!scene.tracing && !isCheckingPhase) {
-            // לחיצה ראשונה בכתיבה חופשית: הצגת הטקסט בתיבה עליונה
             isCheckingPhase = true;
             document.getElementById('referenceTextDisplay').innerText = scene.text;
             document.getElementById('referenceBox').style.display = 'block';
             btnDone.innerText = "בדקתי ותיקנתי! נגן סרטון 🎬";
         } else {
-            // לחיצה שנייה (או בטרייסינג): הפעלת הסרטון
             rewardAndPlayFullVideo();
         }
     }
