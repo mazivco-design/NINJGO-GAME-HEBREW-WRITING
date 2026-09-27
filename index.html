@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>משחק קריאה וכתיבה - נועם</title>
-    <link href="https://fonts.cdnfonts.com/css/guttman-yad" rel="stylesheet">
+    
+    <!-- ייבוא פונט כתב עגול בצורה רחבה יותר -->
     <style>
+        @import url('https://fonts.cdnfonts.com/css/guttman-yad');
+        
         :root {
             --bg-color: #f4f7f6;
             --primary-color: #4CAF50;
@@ -22,11 +25,12 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 30px;
+            padding: 20px;
             display: flex;
             justify-content: center;
         }
 
+        /* מכל האפליקציה - מתרחב במצב משחק */
         #app-container {
             width: 100%;
             max-width: 800px;
@@ -34,7 +38,11 @@
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
+            transition: max-width 0.3s ease;
+        }
+        
+        #app-container.game-mode {
+            max-width: 95%; /* נפתח לרוחב כמעט מלא באייפד כדי לתת מקום לכתיבה */
         }
 
         .top-nav {
@@ -62,7 +70,7 @@
         .btn-success { background-color: var(--primary-color); color: #fff; }
         .btn-danger { background-color: #f44336; color: #fff; }
         .btn-small { padding: 6px 10px; font-size: 14px; margin-left: 3px; }
-        .btn-large { width: 100%; padding: 15px; font-size: 22px; margin-top: 15px; }
+        .btn-large { width: 100%; padding: 15px; font-size: 24px; margin-top: 15px; }
 
         .video-wrapper {
             position: relative;
@@ -76,28 +84,26 @@
         }
         
         .game-mode .video-wrapper {
-            width: 65%;
+            width: 60%;
             margin: 0 auto 15px auto;
         }
         
         #youtubePlayer, #localPlayer { width: 100%; height: 100%; display: none; }
         
-        /* פס שחור להסתרת כתוביות צרובות וסרגל יוטיוב */
+        /* פס חסימת כתוביות מתוקן - ממוקם מעל סרגל השליטה */
         #subtitleBlocker {
             position: absolute;
-            bottom: 0;
+            bottom: 45px; /* משאיר מקום לפס ההתקדמות של יוטיוב */
             left: 0;
             width: 100%;
-            height: 18%; /* מכסה את ה-18% התחתונים של הסרטון */
-            background-color: #000; /* צבע שחור שמתמזג עם הנגן */
+            height: 18%; /* גובה שמכסה את אזור התרגום */
+            background-color: #000;
             z-index: 5;
-            display: none; /* מוסתר כברירת מחדל במצב עריכה */
+            display: none;
+            pointer-events: none; /* מאפשר לחיצות דרכו במקרה הצורך */
         }
         
-        /* מציג את הפס השחור רק במצב משחק */
-        .game-mode #subtitleBlocker {
-            display: block;
-        }
+        .game-mode #subtitleBlocker { display: block; }
 
         #audioOnlyOverlay {
             position: absolute;
@@ -124,46 +130,47 @@
             border: 1px solid #ddd;
         }
 
-        input[type="text"], textarea, select {
+        input[type="text"]:not(.notebook-text), textarea, select {
             width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ccc;
             border-radius: 6px; margin-top: 5px; font-family: inherit;
         }
 
-        #referenceBox {
-            background: #e3f2fd;
-            border: 2px dashed var(--secondary-color);
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            margin-top: 15px;
-            display: none;
-        }
-        
-        #referenceTextDisplay {
-            font-family: 'Guttman Yad', cursive;
-            font-size: 45px;
-            color: #000;
-        }
-
+        /* --- אזור המחברת והכתיבה --- */
         .notebook-area {
             position: relative;
-            margin-top: 15px;
+            margin-top: 25px;
             height: 140px; 
             border-top: 2px solid var(--notebook-top);
             border-bottom: 4px solid var(--notebook-bottom);
             background: #fafafa;
+            overflow: hidden; /* מונע חריגה מהמסגרת */
         }
 
+        /* סגנון משותף לשדה טקסט הקלדה וטקסט דהוי */
         .notebook-text {
-            font-family: 'Guttman Yad', cursive;
-            font-size: 95px;
+            font-family: 'Guttman Yad', 'Ktav Yad', 'Segoe Print', cursive !important;
+            font-size: clamp(40px, 8vw, 95px); /* גודל דינמי למניעת שבירת שורות */
             line-height: 1;
             text-align: center;
             width: 100%;
             position: absolute;
             bottom: -5px; 
             margin: 0;
+            white-space: nowrap; /* מונע גלישה ל-2 שורות */
+            border: none;
+            background: transparent;
+            outline: none;
+        }
+
+        #fadedText { 
+            color: rgba(0, 0, 0, 0.15); 
             pointer-events: none;
+        }
+        
+        /* שדה טקסט נקי להקלדה דרך מקלדת */
+        #keyboardInput {
+            color: #000;
+            z-index: 6;
         }
 
         #drawingCanvas {
@@ -174,8 +181,6 @@
             cursor: crosshair;
         }
 
-        #fadedText { color: rgba(0, 0, 0, 0.15); }
-
         .progress-bar {
             text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 15px;
             color: var(--secondary-color);
@@ -185,11 +190,11 @@
         .time-display { font-family: monospace; font-size: 18px; font-weight: bold; }
         
         .time-controls-row {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin-bottom: 10px;
+            display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+        }
+        
+        .game-controls-container {
+            display: flex; justify-content: center; margin: 20px 0;
         }
     </style>
     <script src="https://www.youtube.com/iframe_api"></script>
@@ -202,7 +207,7 @@
         <button class="btn-nav" onclick="toggleMode()" id="modeToggleBtn">מעבר למשחק 🎮</button>
     </div>
 
-    <!-- מצב עריכה -->
+    <!-- ================= מצב עריכה ================= -->
     <div id="editPanel" class="panel active-panel">
         
         <div class="control-group" style="background-color: #e3f2fd;">
@@ -228,7 +233,7 @@
             <div id="youtubePlayer"></div>
             <video id="localPlayer" controls></video>
             <div id="audioOnlyOverlay">🔊 משמיע סאונד בלבד...</div>
-            <div id="subtitleBlocker"></div> <!-- פס הסתרת הכתוביות -->
+            <div id="subtitleBlocker"></div> <!-- פס ההסתרה החכם -->
         </div>
         
         <div style="text-align: center; margin-bottom: 15px;">
@@ -243,15 +248,12 @@
 
         <div class="control-group">
             <h3>3. הגדרות סצנה</h3>
-            
             <div class="time-controls-row">
                 <button class="btn-action" onclick="markTime('start')">סמן In</button>
                 <button class="btn-small" onclick="adjustInTime(-1)">-1ש'</button>
                 <button class="btn-small" onclick="adjustInTime(1)">+1ש'</button>
                 <span class="time-display" id="lblStart">0:00</span>
-                
                 <span style="margin: 0 10px;">|</span>
-                
                 <button class="btn-action" onclick="markTime('end')">סמן Out</button>
                 <button class="btn-small" onclick="adjustOutTime(-1)">-1ש'</button>
                 <button class="btn-small" onclick="adjustOutTime(1)">+1ש'</button>
@@ -264,9 +266,18 @@
             <label>משפט לסצנה:</label>
             <input type="text" id="sceneText" placeholder="למשל: שָׁלוֹם נוֹעַם!">
             
-            <div style="margin-top: 15px;">
-                <label><input type="checkbox" id="chkTracing" checked style="transform: scale(1.5); margin-left: 10px;"> טרייסינג מופעל (אותיות דהויות מההתחלה)</label>
+            <div style="margin-top: 15px; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                <label style="font-weight: bold;">סוג המשימה לנועם:</label>
+                <div style="margin-top: 8px;">
+                    <input type="radio" name="taskType" id="typeTyping" value="typing" checked> 
+                    <label for="typeTyping">⌨️ הקלדה (שדה טקסט עם בדיקה אוטומטית)</label>
+                </div>
+                <div style="margin-top: 8px;">
+                    <input type="radio" name="taskType" id="typeTracing" value="tracing"> 
+                    <label for="typeTracing">✏️ ציור חופשי / טרייסינג (על קנבס עם אישור ידני)</label>
+                </div>
             </div>
+            
             <div style="margin-top: 10px;">
                 <label><input type="checkbox" id="chkShowInGame" checked style="transform: scale(1.5); margin-left: 10px;"> פעיל במשחק</label>
             </div>
@@ -280,29 +291,29 @@
         </div>
     </div>
 
-    <!-- מצב משחק -->
+    <!-- ================= מצב משחק ================= -->
     <div id="gamePanel" class="panel">
         <div class="progress-bar" id="gameProgress">סצנה 1 מתוך 5</div>
         
         <div id="gameVideoPlaceholder"></div>
         
-        <div id="gameControls" style="text-align:center; margin-top:10px;">
-            <button class="btn-action" id="btnPlayAudio" onclick="playAudioOnly()">השמע משפט 🔊</button>
-        </div>
-
-        <div id="referenceBox">
-            <div>המשפט הנכון:</div>
-            <div id="referenceTextDisplay"></div>
+        <!-- כפתור שמע מופרד לחלוטין מאזור המחברת -->
+        <div class="game-controls-container">
+            <button class="btn-action" style="font-size: 20px; padding: 12px 30px;" id="btnPlayAudio" onclick="playAudioOnly()">השמע משפט 🔊</button>
         </div>
 
         <div class="notebook-area" id="notebookArea">
+            <!-- עבור משימת ציור -->
             <div id="fadedText" class="notebook-text hidden"></div>
-            <canvas id="drawingCanvas"></canvas>
+            <canvas id="drawingCanvas" class="hidden"></canvas>
+            
+            <!-- עבור משימת הקלדה - ביטול השלמות אוטומטיות לא רצויות -->
+            <input type="text" id="keyboardInput" class="notebook-text hidden" placeholder="" autocomplete="off" autocorrect="off" spellcheck="false" dir="rtl">
         </div>
 
-        <div style="display:flex; gap: 10px; margin-top: 15px;">
-            <button class="btn-success btn-large" style="margin-top:0;" id="btnDoneWriting" onclick="checkWriting()">סיימתי לכתוב ✍️</button>
-            <button class="btn-danger btn-large" style="margin-top:0; flex-basis: 30%;" id="btnClearCanvas" onclick="resizeCanvas()">נקה לוח 🗑️</button>
+        <div style="display:flex; gap: 10px; margin-top: 25px;">
+            <button class="btn-success btn-large" style="margin-top:0;" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
+            <button class="btn-danger btn-large hidden" style="margin-top:0; flex-basis: 30%;" id="btnClearCanvas" onclick="resizeCanvas()">נקה לוח 🗑️</button>
         </div>
         
         <button class="btn-action btn-large hidden" id="btnNextScene" onclick="nextScene()">המשך לסצנה הבאה ➡️</button>
@@ -321,7 +332,6 @@
     let checkInterval = null;
     let ytPlayer = null;
     let ytReady = false;
-    let isCheckingPhase = false; 
 
     const ytElement = document.getElementById('youtubePlayer');
     const localElement = document.getElementById('localPlayer');
@@ -359,6 +369,7 @@
         document.getElementById('sceneText').value = '';
         document.getElementById('transcriptArea').value = '';
         document.getElementById('editSceneId').value = '';
+        document.getElementById('typeTyping').checked = true;
         
         updateTimeDisplay();
         renderScenes();
@@ -366,10 +377,7 @@
         ytElement.style.display = 'none';
         localElement.style.display = 'none';
         
-        if (ytPlayer && typeof ytPlayer.stopVideo === 'function') {
-            ytPlayer.stopVideo();
-        }
-        
+        if (ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
         localElement.pause();
         localElement.src = '';
     }
@@ -396,10 +404,7 @@
 
     function loadSelectedProject() {
         const selected = document.getElementById('projectSelect').value;
-        if (!selected) {
-            startNewProject();
-            return;
-        }
+        if (!selected) { startNewProject(); return; }
         currentVideoId = selected;
         videoType = selected.startsWith("YT_") ? 'youtube' : 'local';
         
@@ -411,13 +416,7 @@
             else if (ytReady) {
                 ytPlayer = new YT.Player('youtubePlayer', {
                     videoId: vid,
-                    playerVars: { 
-                        'playsinline': 1, 
-                        'controls': 1, 
-                        'modestbranding': 1, 
-                        'rel': 0,
-                        'hl': 'he' // שפה
-                    },
+                    playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 },
                     events: { 'onStateChange': onPlayerStateChange }
                 });
             }
@@ -443,13 +442,7 @@
             else if (ytReady) {
                 ytPlayer = new YT.Player('youtubePlayer', {
                     videoId: vid,
-                    playerVars: { 
-                        'playsinline': 1, 
-                        'controls': 1, 
-                        'modestbranding': 1, 
-                        'rel': 0,
-                        'hl': 'he'
-                    },
+                    playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 },
                     events: { 'onStateChange': onPlayerStateChange }
                 });
             }
@@ -524,7 +517,8 @@
 
     function saveScene() {
         const text = document.getElementById('sceneText').value.trim();
-        const tracing = document.getElementById('chkTracing').checked;
+        const taskType = document.querySelector('input[name="taskType"]:checked').value;
+        const tracing = (taskType === 'tracing');
         const show = document.getElementById('chkShowInGame').checked;
         const editId = document.getElementById('editSceneId').value;
 
@@ -570,7 +564,7 @@
         tempEnd = s.end;
         updateTimeDisplay();
         document.getElementById('sceneText').value = s.text;
-        document.getElementById('chkTracing').checked = s.tracing;
+        document.getElementById(s.tracing ? 'typeTracing' : 'typeTyping').checked = true;
         document.getElementById('chkShowInGame').checked = s.show;
         document.getElementById('editSceneId').value = s.id;
     }
@@ -579,7 +573,6 @@
         if(confirm("האם אתה בטוח שברצונך למחוק סצנה זו?")) {
             scenes = scenes.filter(x => x.id !== id);
             saveData();
-            
             if (scenes.length === 0) {
                 let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
                 delete allData[currentVideoId];
@@ -595,7 +588,7 @@
         scenes.forEach((s, i) => {
             const li = document.createElement('li');
             li.innerHTML = `<strong>סצנה ${i+1}:</strong> ${formatTime(s.start)} - ${formatTime(s.end)} | 
-                            "${s.text}" | ${s.tracing ? '✏️ טרייסינג' : '⌨️ כתיבה חופשית'} 
+                            "${s.text}" | ${s.tracing ? '✏️ ציור' : '⌨️ הקלדה'} 
                             <button class="btn-action btn-small" onclick="editScene(${s.id})">ערוך</button>
                             <button class="btn-danger btn-small" onclick="deleteScene(${s.id})">מחק</button>`;
             ul.appendChild(li);
@@ -611,9 +604,7 @@
             currentMode = 'game';
             document.getElementById('editPanel').classList.remove('active-panel');
             document.getElementById('gamePanel').classList.add('active-panel');
-            
             appContainer.classList.add('game-mode');
-            
             document.getElementById('mainTitle').innerText = "משחק קריאה";
             document.getElementById('modeToggleBtn').innerText = "חזור לעריכה ⚙️";
             gamePlaceholder.appendChild(editVideoWrapper);
@@ -622,9 +613,7 @@
             currentMode = 'edit';
             document.getElementById('gamePanel').classList.remove('active-panel');
             document.getElementById('editPanel').classList.add('active-panel');
-            
             appContainer.classList.remove('game-mode');
-            
             document.getElementById('mainTitle').innerText = "מצב עריכה";
             document.getElementById('modeToggleBtn').innerText = "מעבר למשחק 🎮";
             document.getElementById('editPanel').insertBefore(editVideoWrapper, document.getElementById('editPanel').children[2]);
@@ -650,28 +639,34 @@
         const scene = activeScenes[currentGameIndex];
         document.getElementById('gameProgress').innerText = `סצנה ${currentGameIndex + 1} מתוך ${activeScenes.length}`;
         
+        // סידור הכפתורים לאתחול סצנה
         document.getElementById('btnNextScene').classList.add('hidden');
         document.getElementById('btnPlayAudio').classList.remove('hidden');
-        document.getElementById('btnClearCanvas').classList.remove('hidden');
-        document.getElementById('referenceBox').style.display = 'none';
-        
-        const btnDone = document.getElementById('btnDoneWriting');
-        btnDone.classList.remove('hidden');
-        btnDone.innerText = "סיימתי לכתוב ✍️";
-        isCheckingPhase = false;
+        document.getElementById('btnDoneWriting').classList.remove('hidden');
         
         seekTo(scene.start);
-        setTimeout(pauseVideo, 300);
+        setTimeout(pauseVideo, 300); // הקפאת תמונה על תחילת הסצנה
         
         const faded = document.getElementById('fadedText');
-        faded.innerText = scene.text;
-        
-        resizeCanvas();
+        const canvasEl = document.getElementById('drawingCanvas');
+        const inputEl = document.getElementById('keyboardInput');
+        const clearBtn = document.getElementById('btnClearCanvas');
         
         if (scene.tracing) {
-            faded.classList.remove('hidden'); 
+            // משימת ציור
+            faded.innerText = scene.text;
+            faded.classList.remove('hidden');
+            canvasEl.classList.remove('hidden');
+            inputEl.classList.add('hidden');
+            clearBtn.classList.remove('hidden');
+            resizeCanvas();
         } else {
-            faded.classList.add('hidden'); 
+            // משימת הקלדה
+            faded.classList.add('hidden');
+            canvasEl.classList.add('hidden');
+            inputEl.classList.remove('hidden');
+            clearBtn.classList.add('hidden');
+            inputEl.value = "";
         }
     }
 
@@ -696,17 +691,25 @@
 
     function onPlayerStateChange(event) {}
 
-    function checkWriting() {
-        const scene = getActiveScenes()[currentGameIndex];
-        const btnDone = document.getElementById('btnDoneWriting');
+    function normalizeHebrew(text) {
+        let clean = text.replace(/[\u0591-\u05C7\s\p{P}]/gu, ''); 
+        return clean.replace(/ם/g, 'מ').replace(/ן/g, 'נ').replace(/ץ/g, 'צ').replace(/ף/g, 'פ').replace(/ך/g, 'כ');
+    }
 
-        if (!scene.tracing && !isCheckingPhase) {
-            isCheckingPhase = true;
-            document.getElementById('referenceTextDisplay').innerText = scene.text;
-            document.getElementById('referenceBox').style.display = 'block';
-            btnDone.innerText = "בדקתי ותיקנתי! נגן סרטון 🎬";
-        } else {
+    function checkTask() {
+        const scene = getActiveScenes()[currentGameIndex];
+
+        if (scene.tracing) {
+            // בציור חופשי אין דרך לבדוק אוטומטית - הלחיצה משחררת את הפרס
             rewardAndPlayFullVideo();
+        } else {
+            // בדיקת הקלדה מדויקת
+            const userInput = document.getElementById('keyboardInput').value;
+            if (normalizeHebrew(userInput) === normalizeHebrew(scene.text)) {
+                rewardAndPlayFullVideo();
+            } else {
+                alert("כמעט נכון! נסה לבדוק שוב את האותיות.");
+            }
         }
     }
 
@@ -715,7 +718,9 @@
         document.getElementById('btnDoneWriting').classList.add('hidden');
         document.getElementById('btnClearCanvas').classList.add('hidden');
         document.getElementById('btnPlayAudio').classList.add('hidden');
-        document.getElementById('referenceBox').style.display = 'none';
+        
+        // הסתרת מקלדת אם היא פתוחה
+        document.getElementById('keyboardInput').blur();
         
         seekTo(scene.start);
         playVideo();
@@ -736,19 +741,22 @@
     }
 
     function resizeCanvas() {
-        const area = document.getElementById('notebookArea');
-        canvas.width = area.offsetWidth;
-        canvas.height = area.offsetHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = '#000000';
+        if (!document.getElementById('drawingCanvas').classList.contains('hidden')) {
+            const area = document.getElementById('notebookArea');
+            canvas.width = area.offsetWidth;
+            canvas.height = area.offsetHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000000';
+        }
     }
 
     window.addEventListener('resize', () => {
         if (currentMode === 'game') resizeCanvas();
     });
 
+    // פונקציות לציור על קנבס
     function getPos(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
