@@ -1,339 +1,93 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>משחק סצנות וכתיבה לנועם</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-    body { background-color: #f8fafc; color: #1e293b; padding: 16px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-y: auto; }
-    
-    /* תפריט עליון מקובע ומרחף מעל הכל כדי שלא יחסם באייפד */
-    .header { 
-      position: sticky; top: 10px; z-index: 100; 
-      width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; 
-      background: white; padding: 12px 16px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
-      margin-bottom: 16px; 
-    }
-    
-    .btn { background: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 15px; }
-    .btn:active { transform: scale(0.98); }
-    .btn-secondary { background: #e2e8f0; color: #334155; }
-    .btn-success { background: #22c55e; color: white; }
-    .card { width: 100%; max-width: 600px; background: white; padding: 16px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; z-index: 10; }
-    .video-box { width: 100%; aspect-ratio: 16/9; background: black; border-radius: 12px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; z-index: 10; }
-    #youtube-player { width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; z-index: 1; pointer-events: auto; }
-    .poster-overlay { position: absolute; inset: 0; background: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 10px; z-index: 5; pointer-events: none; }
-    .canvas-wrap { position: relative; width: 100%; height: 200px; border: 3px solid #cbd5e1; border-radius: 12px; background: white; overflow: hidden; touch-action: none !important; z-index: 10; }
-    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none !important; }
-    input[type="text"], input[type="number"] { width: 100%; padding: 12px; border: 2px solid #cbd5e1; border-radius: 10px; font-size: 16px; outline: none; direction: rtl; }
-    input:focus { border-color: #3b82f6; }
-    .hidden { display: none !important; }
-    .flex-row { display: flex; gap: 8px; }
-    .label { font-size: 14px; font-weight: bold; color: #475569; }
-    
-    .scene-manager { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-    .scene-controls { display: flex; justify-content: space-between; align-items: center; }
-  </style>
+    <meta charset="UTF-8">
+    <title>עריכת משחק קריאה - נינג'גו</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #video-container { max-width: 600px; margin-bottom: 20px; }
+        /* עיצוב בסיסי לנגן */
+        video { width: 100%; border: 2px solid #ccc; border-radius: 8px; }
+        .editor-panel { margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 8px; }
+        button { padding: 8px 16px; margin-left: 10px; cursor: pointer; }
+    </style>
 </head>
 <body>
-
-  <div class="header">
-    <h1 style="font-size: 18px; color: #2563eb;">🎮 משחק סצנות וכתיבה</h1>
-    <button class="btn btn-secondary" id="mode-btn">⚙️ מעבר לעריכה</button>
-  </div>
-
-  <!-- GAME VIEW -->
-  <div id="game-view" class="card">
-    <div class="video-box">
-      <div id="youtube-container"></div>
-      <div id="poster-overlay" class="poster-overlay">
-        <span style="font-size: 40px; margin-bottom: 8px;">🎬</span>
-        <span style="font-size: 16px;">הגדר קישור יוטיוב במצב עריכה כדי להתחיל</span>
-      </div>
-    </div>
-
-    <div class="flex-row" style="justify-content: space-between; align-items: center;">
-      <button class="btn" style="background: #f59e0b;" id="hint-btn">🔊 השמע רמז מהסרטון</button>
-      <span id="scene-counter" style="font-size: 14px; font-weight: bold; color: #64748b;">סצנה 1 מתוך 3</span>
-    </div>
-
-    <div id="target-sentence-container" style="text-align: center; background: #eff6ff; padding: 10px; border-radius: 10px;">
-      <span style="font-size: 12px; color: #3b82f6; display: block;">המשפט לכתיבה:</span>
-      <span id="display-target-text" style="font-size: 22px; font-weight: bold; color: #1e3a8a;">שלום עולם</span>
-    </div>
-
-    <div class="canvas-wrap" id="canvas-wrap">
-      <canvas id="guide-canvas"></canvas>
-      <canvas id="draw-canvas"></canvas>
-    </div>
-
-    <div class="flex-row">
-      <button class="btn btn-secondary" style="flex: 1;" id="clear-btn">🗑️ נקה לוח</button>
-      <button class="btn btn-success" style="flex: 2;" id="check-btn">✓ סיימתי לכתוב!</button>
-    </div>
-
-    <input type="text" id="type-input" placeholder="או הקלד כאן את המשפט...">
-  </div>
-
-  <!-- ADMIN VIEW -->
-  <div id="admin-view" class="card hidden">
-    <h2 style="font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">מצב עריכה וניהול סצנות</h2>
+    <h1>מצב עריכה - יצירת סצנות לנועם</h1>
     
-    <div style="display: flex; flex-direction: column; gap: 4px;">
-      <span class="label">קישור סרטון יוטיוב:</span>
-      <input type="text" id="edit-yt-url" placeholder="הדבק כאן קישור יוטיוב מלא">
-      <button class="btn btn-secondary" id="load-yt-btn" style="margin-top: 4px;">טען סרטון לנגן</button>
+    <div id="video-container">
+        <!-- המאפיין controls נוסף כאן כדי לאפשר הרצה, עצירה וסקרבינג (Scrubbing) -->
+        <video id="gameVideo" controls>
+            <!-- החלף את ה-src לנתיב הסרטון שלך -->
+            <source src="ninjago_episode.mp4" type="video/mp4">
+            הדפדפן שלך אינו תומך בתגית וידאו.
+        </video>
     </div>
 
-    <div class="scene-manager">
-      <div class="scene-controls">
-        <button class="btn btn-secondary" style="padding: 6px 12px;" id="btn-prev-scene">◀ קודם</button>
-        <span id="edit-scene-counter" style="font-weight: bold; font-size: 14px;">עורך סצנה 1 מתוך 3</span>
-        <button class="btn btn-secondary" style="padding: 6px 12px;" id="btn-next-scene">הבא ▶</button>
-      </div>
-      
-      <div style="display: flex; flex-direction: column; gap: 4px;">
-        <span class="label">המשפט המבוקש לסצנה:</span>
-        <input type="text" id="edit-text">
-      </div>
-
-      <div class="flex-row">
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-          <span class="label">התחלה (שניות):</span>
-          <input type="number" id="edit-start" min="0" step="1">
-        </div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-          <span class="label">סיום (שניות):</span>
-          <input type="number" id="edit-end" min="0" step="1">
-        </div>
-      </div>
-      
-      <button class="btn" style="background: #64748b;" id="btn-add-scene">➕ הוסף סצנה חדשה לגמרי</button>
+    <div class="editor-panel">
+        <button onclick="markStartTime()">סמן התחלת סצנה (In)</button>
+        <button onclick="markEndTime()">סמן סיום סצנה (Out)</button>
+        <p>זמן התחלה: <span id="displayStart">0</span> | זמן סיום: <span id="displayEnd">0</span></p>
+        
+        <label>טקסט מנוקד לקריאה:</label><br>
+        <textarea id="sceneText" rows="4" style="width: 100%; margin-top: 5px;"></textarea><br><br>
+        
+        <button onclick="saveScene()" style="background-color: #4CAF50; color: white; border: none;">שמור סצנה</button>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 10px; border-radius: 8px; margin-top: 8px;">
-      <input type="checkbox" id="edit-show-text" checked style="width: 20px; height: 20px;">
-      <label for="edit-show-text" class="label" style="cursor: pointer;">הצג את המשפט לילד (בטל לתרגול שמיעה בלבד)</label>
-    </div>
+    <h3>סצנות שנשמרו:</h3>
+    <ul id="scenesList"></ul>
 
-    <div style="display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 10px; border-radius: 8px;">
-      <input type="checkbox" id="edit-tracing" checked style="width: 20px; height: 20px;">
-      <label for="edit-tracing" class="label" style="cursor: pointer;">הפעל מצב Tracing (אותיות דהויות ברקע הלוח)</label>
-    </div>
+    <script>
+        let startTime = 0;
+        let endTime = 0;
+        const video = document.getElementById('gameVideo');
+        const scenes = []; // המערך שישמור את כל הסצנות שחתכת
 
-    <button class="btn" id="save-btn" style="margin-top: 10px;">שמור סצנות וחזור למשחק</button>
-  </div>
-
-  <!-- YouTube IFrame API -->
-  <script src="https://www.youtube.com/iframe_api"></script>
-  <script>
-    let player;
-    let ytReady = false;
-    let currentVideoId = 'M7lc1UVf-VE'; 
-    let isEditMode = false;
-    
-    let scenes = [
-      { text: "שלום עולם", start: 0, end: 5 }
-    ];
-    let currentSceneIdx = 0;
-    let editSceneIdx = 0;
-
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('youtube-container', {
-        height: '100%',
-        width: '100%',
-        videoId: currentVideoId,
-        playerVars: { 'playsinline': 1, 'controls': 0, 'disablekb': 1 },
-        events: { 'onReady': () => { ytReady = true; } }
-      });
-    }
-
-    function extractVideoId(url) {
-      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-      const match = url.match(regExp);
-      return (match && match[2].length === 11) ? match[2] : null;
-    }
-
-    document.getElementById('load-yt-btn').addEventListener('click', () => {
-      const url = document.getElementById('edit-yt-url').value;
-      const vidId = extractVideoId(url);
-      if (vidId) {
-        currentVideoId = vidId;
-        if (player && ytReady) {
-          player.loadVideoById(currentVideoId);
+        function markStartTime() {
+            startTime = video.currentTime;
+            document.getElementById('displayStart').innerText = startTime.toFixed(2) + "s";
         }
-        document.getElementById('poster-overlay').style.display = 'none';
-        alert('הסרטון נטען בהצלחה!');
-      } else {
-        alert('קישור יוטיוב אינו תקין.');
-      }
-    });
 
-    document.getElementById('mode-btn').addEventListener('click', () => {
-      isEditMode = !isEditMode;
-      const gameView = document.getElementById('game-view');
-      const adminView = document.getElementById('admin-view');
-      const modeBtn = document.getElementById('mode-btn');
+        function markEndTime() {
+            endTime = video.currentTime;
+            document.getElementById('displayEnd').innerText = endTime.toFixed(2) + "s";
+        }
 
-      if (isEditMode) {
-        gameView.classList.add('hidden');
-        adminView.classList.remove('hidden');
-        modeBtn.textContent = '🎮 חזור למשחק';
-        editSceneIdx = currentSceneIdx;
-        updateEditFormUI();
-      } else {
-        gameView.classList.remove('hidden');
-        adminView.classList.add('hidden');
-        modeBtn.textContent = '⚙️ מעבר לעריכה';
-        initScene();
-      }
-    });
-
-    // Scene Manager Logic
-    function updateEditFormUI() {
-      const s = scenes[editSceneIdx];
-      document.getElementById('edit-text').value = s.text;
-      document.getElementById('edit-start').value = s.start;
-      document.getElementById('edit-end').value = s.end;
-      document.getElementById('edit-scene-counter').textContent = `עורך סצנה ${editSceneIdx + 1} מתוך ${scenes.length}`;
-    }
-
-    function saveCurrentEdit() {
-      if (scenes[editSceneIdx]) {
-        scenes[editSceneIdx].text = document.getElementById('edit-text').value;
-        scenes[editSceneIdx].start = parseFloat(document.getElementById('edit-start').value) || 0;
-        scenes[editSceneIdx].end = parseFloat(document.getElementById('edit-end').value) || 5;
-      }
-    }
-
-    document.getElementById('btn-prev-scene').addEventListener('click', () => {
-      saveCurrentEdit();
-      if (editSceneIdx > 0) { editSceneIdx--; updateEditFormUI(); }
-    });
-
-    document.getElementById('btn-next-scene').addEventListener('click', () => {
-      saveCurrentEdit();
-      if (editSceneIdx < scenes.length - 1) { editSceneIdx++; updateEditFormUI(); }
-    });
-
-    document.getElementById('btn-add-scene').addEventListener('click', () => {
-      saveCurrentEdit();
-      scenes.push({ text: "משפט חדש", start: 0, end: 5 });
-      editSceneIdx = scenes.length - 1;
-      updateEditFormUI();
-    });
-
-    document.getElementById('save-btn').addEventListener('click', () => {
-      saveCurrentEdit();
-      currentSceneIdx = editSceneIdx; // Start playing from the edited scene
-      alert('הסצנות נשמרו!');
-      document.getElementById('mode-btn').click();
-    });
-
-    function initScene() {
-      const s = scenes[currentSceneIdx];
-      document.getElementById('display-target-text').textContent = s.text;
-      document.getElementById('scene-counter').textContent = `סצנה ${currentSceneIdx + 1} מתוך ${scenes.length}`;
-      
-      const showText = document.getElementById('edit-show-text').checked;
-      document.getElementById('target-sentence-container').style.display = showText ? 'block' : 'none';
-
-      setupCanvas();
-    }
-
-    document.getElementById('hint-btn').addEventListener('click', () => {
-      const s = scenes[currentSceneIdx];
-      if (!player || !ytReady) {
-        alert('הנגן טרם נטען במלואו.');
-        return;
-      }
-      document.getElementById('poster-overlay').style.display = 'none';
-      player.seekTo(s.start, true);
-      player.playVideo();
-      
-      setTimeout(() => { player.pauseVideo(); }, (s.end - s.start) * 1000);
-    });
-
-    document.getElementById('check-btn').addEventListener('click', playSuccessAndNext);
-    
-    document.getElementById('type-input').addEventListener('input', (e) => {
-      const typed = e.target.value;
-      const target = scenes[currentSceneIdx].text;
-      if (typed.trim() === target.trim()) {
-        e.target.value = '';
-        playSuccessAndNext();
-      }
-    });
-
-    function playSuccessAndNext() {
-      alert('כל הכבוד! הצלחת לפענח את הסצנה! 🎉');
-      document.getElementById('hint-btn').click();
-      setTimeout(() => {
-        currentSceneIdx = (currentSceneIdx + 1) % scenes.length;
-        initScene();
-        clearCanvas();
-      }, 4000);
-    }
-
-    // Canvas & Tracing Setup
-    const drawCanvas = document.getElementById('draw-canvas');
-    const guideCanvas = document.getElementById('guide-canvas');
-    const dctx = drawCanvas.getContext('2d');
-    const gctx = guideCanvas.getContext('2d');
-    let isDrawing = false;
-
-    function setupCanvas() {
-      const wrap = document.getElementById('canvas-wrap');
-      [drawCanvas, guideCanvas].forEach(c => { c.width = wrap.clientWidth; c.height = wrap.clientHeight; });
-      drawGuidelinesAndTracing();
-    }
-
-    function drawGuidelinesAndTracing() {
-      const w = guideCanvas.width;
-      const h = guideCanvas.height;
-      gctx.clearRect(0, 0, w, h);
-
-      gctx.strokeStyle = '#cbd5e1'; gctx.lineWidth = 2;
-      gctx.beginPath(); gctx.moveTo(0, h * 0.7); gctx.lineTo(w, h * 0.7); gctx.stroke();
-
-      const tracingOn = document.getElementById('edit-tracing').checked;
-      if (tracingOn) {
-        gctx.font = 'bold 32px system-ui'; gctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
-        gctx.textAlign = 'center'; gctx.textBaseline = 'middle';
-        gctx.fillText(scenes[currentSceneIdx].text, w / 2, h / 2);
-      }
-    }
-
-    function getPos(e) {
-      const rect = drawCanvas.getBoundingClientRect();
-      const clientX = e.clientX !== undefined ? e.clientX : (e.touches ? e.touches[0].clientX : 0);
-      const clientY = e.clientY !== undefined ? e.clientY : (e.touches ? e.touches[0].clientY : 0);
-      return { x: clientX - rect.left, y: clientY - rect.top };
-    }
-
-    drawCanvas.addEventListener('pointerdown', (e) => {
-      e.preventDefault(); isDrawing = true; const pos = getPos(e);
-      dctx.beginPath(); dctx.moveTo(pos.x, pos.y); drawCanvas.setPointerCapture(e.pointerId);
-    });
-
-    drawCanvas.addEventListener('pointermove', (e) => {
-      if (!isDrawing) return; e.preventDefault(); const pos = getPos(e);
-      dctx.lineWidth = 4; dctx.lineCap = 'round'; dctx.lineJoin = 'round';
-      dctx.strokeStyle = '#0f172a'; dctx.lineTo(pos.x, pos.y); dctx.stroke();
-    });
-
-    function stopDraw(e) {
-      if (isDrawing) {
-        isDrawing = false;
-        if (e && e.pointerId) { try { drawCanvas.releasePointerCapture(e.pointerId); } catch(err) {} }
-      }
-    }
-
-    drawCanvas.addEventListener('pointerup', stopDraw);
-    drawCanvas.addEventListener('pointercancel', stopDraw);
-    document.getElementById('clear-btn').addEventListener('click', clearCanvas);
-    function clearCanvas() { dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); }
-  </script>
+        function saveScene() {
+            const text = document.getElementById('sceneText').value;
+            
+            if (endTime <= startTime) {
+                alert("זמן הסיום חייב להיות אחרי זמן ההתחלה.");
+                return;
+            }
+            if (text.trim() === "") {
+                alert("אנא הזן טקסט לקריאה עבור סצנה זו.");
+                return;
+            }
+            
+            // יצירת אובייקט הסצנה
+            const newScene = { 
+                id: scenes.length + 1,
+                start: startTime, 
+                end: endTime, 
+                text: text 
+            };
+            
+            scenes.push(newScene);
+            
+            // עדכון התצוגה של הרשימה
+            const listItem = document.createElement('li');
+            listItem.innerHTML = `<strong>סצנה ${newScene.id}:</strong> ${newScene.start.toFixed(2)}s - ${newScene.end.toFixed(2)}s <br> טקסט: ${newScene.text}`;
+            document.getElementById('scenesList').appendChild(listItem);
+            
+            // איפוס שדות לקראת הסצנה הבאה
+            document.getElementById('sceneText').value = '';
+            document.getElementById('displayStart').innerText = '0';
+            document.getElementById('displayEnd').innerText = '0';
+            
+            console.log("סצנות עדכניות:", scenes);
+        }
+    </script>
 </body>
 </html>
