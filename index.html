@@ -7,22 +7,33 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
     body { background-color: #f8fafc; color: #1e293b; padding: 16px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-y: auto; }
-    .header { width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 16px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 16px; }
+    
+    /* תפריט עליון מקובע ומרחף מעל הכל כדי שלא יחסם באייפד */
+    .header { 
+      position: sticky; top: 10px; z-index: 100; 
+      width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; 
+      background: white; padding: 12px 16px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+      margin-bottom: 16px; 
+    }
+    
     .btn { background: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 15px; }
     .btn:active { transform: scale(0.98); }
     .btn-secondary { background: #e2e8f0; color: #334155; }
     .btn-success { background: #22c55e; color: white; }
-    .card { width: 100%; max-width: 600px; background: white; padding: 16px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
-    .video-box { width: 100%; aspect-ratio: 16/9; background: black; border-radius: 12px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; }
-    #youtube-player { width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; }
-    .poster-overlay { position: absolute; inset: 0; background: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 10px; z-index: 5; }
-    .canvas-wrap { position: relative; width: 100%; height: 200px; border: 3px solid #cbd5e1; border-radius: 12px; background: white; overflow: hidden; touch-action: none !important; }
+    .card { width: 100%; max-width: 600px; background: white; padding: 16px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; z-index: 10; }
+    .video-box { width: 100%; aspect-ratio: 16/9; background: black; border-radius: 12px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; z-index: 10; }
+    #youtube-player { width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; z-index: 1; pointer-events: auto; }
+    .poster-overlay { position: absolute; inset: 0; background: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 10px; z-index: 5; pointer-events: none; }
+    .canvas-wrap { position: relative; width: 100%; height: 200px; border: 3px solid #cbd5e1; border-radius: 12px; background: white; overflow: hidden; touch-action: none !important; z-index: 10; }
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none !important; }
     input[type="text"], input[type="number"] { width: 100%; padding: 12px; border: 2px solid #cbd5e1; border-radius: 10px; font-size: 16px; outline: none; direction: rtl; }
     input:focus { border-color: #3b82f6; }
     .hidden { display: none !important; }
     .flex-row { display: flex; gap: 8px; }
     .label { font-size: 14px; font-weight: bold; color: #475569; }
+    
+    .scene-manager { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .scene-controls { display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
@@ -70,28 +81,38 @@
     <h2 style="font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">מצב עריכה וניהול סצנות</h2>
     
     <div style="display: flex; flex-direction: column; gap: 4px;">
-      <span class="label">קישור סרטון יוטיוב (פועל חלק ב-GitHub Pages):</span>
+      <span class="label">קישור סרטון יוטיוב:</span>
       <input type="text" id="edit-yt-url" placeholder="הדבק כאן קישור יוטיוב מלא">
       <button class="btn btn-secondary" id="load-yt-btn" style="margin-top: 4px;">טען סרטון לנגן</button>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 4px;">
-      <span class="label">המשפט המבוקש לסצנה:</span>
-      <input type="text" id="edit-text">
+    <div class="scene-manager">
+      <div class="scene-controls">
+        <button class="btn btn-secondary" style="padding: 6px 12px;" id="btn-prev-scene">◀ קודם</button>
+        <span id="edit-scene-counter" style="font-weight: bold; font-size: 14px;">עורך סצנה 1 מתוך 3</span>
+        <button class="btn btn-secondary" style="padding: 6px 12px;" id="btn-next-scene">הבא ▶</button>
+      </div>
+      
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <span class="label">המשפט המבוקש לסצנה:</span>
+        <input type="text" id="edit-text">
+      </div>
+
+      <div class="flex-row">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+          <span class="label">התחלה (שניות):</span>
+          <input type="number" id="edit-start" min="0" step="1">
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+          <span class="label">סיום (שניות):</span>
+          <input type="number" id="edit-end" min="0" step="1">
+        </div>
+      </div>
+      
+      <button class="btn" style="background: #64748b;" id="btn-add-scene">➕ הוסף סצנה חדשה לגמרי</button>
     </div>
 
-    <div class="flex-row">
-      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-        <span class="label">התחלה (שניות):</span>
-        <input type="number" id="edit-start" min="0" step="1">
-      </div>
-      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-        <span class="label">סיום (שניות):</span>
-        <input type="number" id="edit-end" min="0" step="1">
-      </div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 10px; border-radius: 8px;">
+    <div style="display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 10px; border-radius: 8px; margin-top: 8px;">
       <input type="checkbox" id="edit-show-text" checked style="width: 20px; height: 20px;">
       <label for="edit-show-text" class="label" style="cursor: pointer;">הצג את המשפט לילד (בטל לתרגול שמיעה בלבד)</label>
     </div>
@@ -101,7 +122,7 @@
       <label for="edit-tracing" class="label" style="cursor: pointer;">הפעל מצב Tracing (אותיות דהויות ברקע הלוח)</label>
     </div>
 
-    <button class="btn" id="save-btn">שמור והחל שינויים</button>
+    <button class="btn" id="save-btn" style="margin-top: 10px;">שמור סצנות וחזור למשחק</button>
   </div>
 
   <!-- YouTube IFrame API -->
@@ -109,15 +130,14 @@
   <script>
     let player;
     let ytReady = false;
-    let currentVideoId = 'M7lc1UVf-VE'; // Default sample
+    let currentVideoId = 'M7lc1UVf-VE'; 
     let isEditMode = false;
     
     let scenes = [
-      { text: "שלום עולם", start: 0, end: 5 },
-      { text: "בוקר טוב לנועם", start: 5, end: 10 },
-      { text: "יוצרים סיפור יפה", start: 10, end: 15 }
+      { text: "שלום עולם", start: 0, end: 5 }
     ];
     let currentSceneIdx = 0;
+    let editSceneIdx = 0;
 
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('youtube-container', {
@@ -125,9 +145,7 @@
         width: '100%',
         videoId: currentVideoId,
         playerVars: { 'playsinline': 1, 'controls': 0, 'disablekb': 1 },
-        events: {
-          'onReady': () => { ytReady = true; }
-        }
+        events: { 'onReady': () => { ytReady = true; } }
       });
     }
 
@@ -162,7 +180,8 @@
         gameView.classList.add('hidden');
         adminView.classList.remove('hidden');
         modeBtn.textContent = '🎮 חזור למשחק';
-        loadEditForm();
+        editSceneIdx = currentSceneIdx;
+        updateEditFormUI();
       } else {
         gameView.classList.remove('hidden');
         adminView.classList.add('hidden');
@@ -171,18 +190,44 @@
       }
     });
 
-    function loadEditForm() {
-      const s = scenes[currentSceneIdx];
+    // Scene Manager Logic
+    function updateEditFormUI() {
+      const s = scenes[editSceneIdx];
       document.getElementById('edit-text').value = s.text;
       document.getElementById('edit-start').value = s.start;
       document.getElementById('edit-end').value = s.end;
+      document.getElementById('edit-scene-counter').textContent = `עורך סצנה ${editSceneIdx + 1} מתוך ${scenes.length}`;
     }
 
+    function saveCurrentEdit() {
+      if (scenes[editSceneIdx]) {
+        scenes[editSceneIdx].text = document.getElementById('edit-text').value;
+        scenes[editSceneIdx].start = parseFloat(document.getElementById('edit-start').value) || 0;
+        scenes[editSceneIdx].end = parseFloat(document.getElementById('edit-end').value) || 5;
+      }
+    }
+
+    document.getElementById('btn-prev-scene').addEventListener('click', () => {
+      saveCurrentEdit();
+      if (editSceneIdx > 0) { editSceneIdx--; updateEditFormUI(); }
+    });
+
+    document.getElementById('btn-next-scene').addEventListener('click', () => {
+      saveCurrentEdit();
+      if (editSceneIdx < scenes.length - 1) { editSceneIdx++; updateEditFormUI(); }
+    });
+
+    document.getElementById('btn-add-scene').addEventListener('click', () => {
+      saveCurrentEdit();
+      scenes.push({ text: "משפט חדש", start: 0, end: 5 });
+      editSceneIdx = scenes.length - 1;
+      updateEditFormUI();
+    });
+
     document.getElementById('save-btn').addEventListener('click', () => {
-      scenes[currentSceneIdx].text = document.getElementById('edit-text').value;
-      scenes[currentSceneIdx].start = parseFloat(document.getElementById('edit-start').value) || 0;
-      scenes[currentSceneIdx].end = parseFloat(document.getElementById('edit-end').value) || 5;
-      alert('הגדרות נשמרו!');
+      saveCurrentEdit();
+      currentSceneIdx = editSceneIdx; // Start playing from the edited scene
+      alert('הסצנות נשמרו!');
       document.getElementById('mode-btn').click();
     });
 
@@ -207,9 +252,7 @@
       player.seekTo(s.start, true);
       player.playVideo();
       
-      setTimeout(() => {
-        player.pauseVideo();
-      }, (s.end - s.start) * 1000);
+      setTimeout(() => { player.pauseVideo(); }, (s.end - s.start) * 1000);
     });
 
     document.getElementById('check-btn').addEventListener('click', playSuccessAndNext);
@@ -242,10 +285,7 @@
 
     function setupCanvas() {
       const wrap = document.getElementById('canvas-wrap');
-      [drawCanvas, guideCanvas].forEach(c => {
-        c.width = wrap.clientWidth;
-        c.height = wrap.clientHeight;
-      });
+      [drawCanvas, guideCanvas].forEach(c => { c.width = wrap.clientWidth; c.height = wrap.clientHeight; });
       drawGuidelinesAndTracing();
     }
 
@@ -254,19 +294,13 @@
       const h = guideCanvas.height;
       gctx.clearRect(0, 0, w, h);
 
-      gctx.strokeStyle = '#cbd5e1';
-      gctx.lineWidth = 2;
-      gctx.beginPath();
-      gctx.moveTo(0, h * 0.7);
-      gctx.lineTo(w, h * 0.7);
-      gctx.stroke();
+      gctx.strokeStyle = '#cbd5e1'; gctx.lineWidth = 2;
+      gctx.beginPath(); gctx.moveTo(0, h * 0.7); gctx.lineTo(w, h * 0.7); gctx.stroke();
 
       const tracingOn = document.getElementById('edit-tracing').checked;
       if (tracingOn) {
-        gctx.font = 'bold 32px system-ui';
-        gctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
-        gctx.textAlign = 'center';
-        gctx.textBaseline = 'middle';
+        gctx.font = 'bold 32px system-ui'; gctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
+        gctx.textAlign = 'center'; gctx.textBaseline = 'middle';
         gctx.fillText(scenes[currentSceneIdx].text, w / 2, h / 2);
       }
     }
@@ -279,43 +313,27 @@
     }
 
     drawCanvas.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      isDrawing = true;
-      const pos = getPos(e);
-      dctx.beginPath();
-      dctx.moveTo(pos.x, pos.y);
-      drawCanvas.setPointerCapture(e.pointerId);
+      e.preventDefault(); isDrawing = true; const pos = getPos(e);
+      dctx.beginPath(); dctx.moveTo(pos.x, pos.y); drawCanvas.setPointerCapture(e.pointerId);
     });
 
     drawCanvas.addEventListener('pointermove', (e) => {
-      if (!isDrawing) return;
-      e.preventDefault();
-      const pos = getPos(e);
-      dctx.lineWidth = 4;
-      dctx.lineCap = 'round';
-      dctx.lineJoin = 'round';
-      dctx.strokeStyle = '#0f172a';
-      dctx.lineTo(pos.x, pos.y);
-      dctx.stroke();
+      if (!isDrawing) return; e.preventDefault(); const pos = getPos(e);
+      dctx.lineWidth = 4; dctx.lineCap = 'round'; dctx.lineJoin = 'round';
+      dctx.strokeStyle = '#0f172a'; dctx.lineTo(pos.x, pos.y); dctx.stroke();
     });
 
     function stopDraw(e) {
       if (isDrawing) {
         isDrawing = false;
-        if (e && e.pointerId) {
-          try { drawCanvas.releasePointerCapture(e.pointerId); } catch(err) {}
-        }
+        if (e && e.pointerId) { try { drawCanvas.releasePointerCapture(e.pointerId); } catch(err) {} }
       }
     }
 
     drawCanvas.addEventListener('pointerup', stopDraw);
     drawCanvas.addEventListener('pointercancel', stopDraw);
-
     document.getElementById('clear-btn').addEventListener('click', clearCanvas);
-
-    function clearCanvas() {
-      dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    }
+    function clearCanvas() { dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); }
   </script>
 </body>
 </html>
