@@ -2,56 +2,142 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>עריכת משחק קריאה - נינג'גו</title>
+    <title>עריכת משחק קריאה - נינג'גו (יוטיוב)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        #video-container { max-width: 600px; margin-bottom: 20px; }
-        /* עיצוב בסיסי לנגן */
-        video { width: 100%; border: 2px solid #ccc; border-radius: 8px; }
-        .editor-panel { margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 8px; }
-        button { padding: 8px 16px; margin-left: 10px; cursor: pointer; }
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9; }
+        .panel { margin-top: 15px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        #video-container { margin-top: 15px; display: none; }
+        
+        button { padding: 8px 16px; margin-left: 10px; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; }
+        .btn-load { background-color: #2196F3; color: white; border: none; }
+        .btn-save { background-color: #4CAF50; color: white; border: none; font-weight: bold; }
+        
+        input[type="text"] { width: 60%; padding: 8px; font-size: 16px; }
+        
+        /* עיצוב הטקסט במצב משחק */
+        .game-text-area {
+            position: relative;
+            margin-top: 30px;
+            height: 60px;
+            text-align: center;
+            background: #eee; /* רקע עדין להדגשה */
+            border-radius: 8px;
+        }
+        
+        .text-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            font-family: 'Guttman Yad', 'Ktav Yad', 'Amatic SC', cursive;
+            font-size: 45px;
+            line-height: 60px;
+        }
+        
+        .text-faded { color: rgba(0, 0, 0, 0.15); }
+        .text-active { color: #000; }
     </style>
+    <!-- טעינת הספרייה של יוטיוב -->
+    <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
-    <h1>מצב עריכה - יצירת סצנות לנועם</h1>
+    <h1>ניהול ועריכת סצנות (מיוטיוב)</h1>
     
-    <div id="video-container">
-        <!-- המאפיין controls נוסף כאן כדי לאפשר הרצה, עצירה וסקרבינג (Scrubbing) -->
-        <video id="gameVideo" controls>
-            <!-- החלף את ה-src לנתיב הסרטון שלך -->
-            <source src="ninjago_episode.mp4" type="video/mp4">
-            הדפדפן שלך אינו תומך בתגית וידאו.
-        </video>
+    <div class="panel">
+        <label>הדבק קישור ליוטיוב:</label><br><br>
+        <input type="text" id="youtubeUrl" placeholder="לדוגמה: https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+        <button class="btn-load" onclick="loadYouTubeVideo()">טען סרטון</button>
     </div>
 
-    <div class="editor-panel">
+    <div id="video-container">
+        <!-- נגן היוטיוב יוזרק לכאן -->
+        <div id="ytplayer"></div>
+    </div>
+
+    <div class="panel" id="editorPanel" style="display: none;">
         <button onclick="markStartTime()">סמן התחלת סצנה (In)</button>
         <button onclick="markEndTime()">סמן סיום סצנה (Out)</button>
         <p>זמן התחלה: <span id="displayStart">0</span> | זמן סיום: <span id="displayEnd">0</span></p>
         
-        <label>טקסט מנוקד לקריאה:</label><br>
-        <textarea id="sceneText" rows="4" style="width: 100%; margin-top: 5px;"></textarea><br><br>
+        <label>טקסט לניקוד וקריאה (בכתב יד):</label><br>
+        <textarea id="sceneText" rows="2" style="width: 100%; margin-top: 5px; font-size: 20px; font-family: 'Guttman Yad', cursive;"></textarea><br><br>
         
-        <button onclick="saveScene()" style="background-color: #4CAF50; color: white; border: none;">שמור סצנה</button>
+        <button class="btn-save" onclick="saveScene()">שמור סצנה</button>
     </div>
 
-    <h3>סצנות שנשמרו:</h3>
-    <ul id="scenesList"></ul>
+    <div class="panel">
+        <h3>סצנות שנשמרו עבור סרטון זה:</h3>
+        <ul id="scenesList"></ul>
+    </div>
+
+    <div class="panel">
+        <h3>תצוגה מקדימה - מיקום הטקסט:</h3>
+        <div class="game-text-area">
+            <div class="text-layer text-faded">שלום נועם, ברוך הבא לנינג'גו</div>
+            <!-- דוגמה לטקסט שנקרא חלקית, מיושר בדיוק מעל -->
+            <div class="text-layer text-active" style="width: 40%; overflow: hidden; text-align: right; white-space: nowrap; margin-right: 30%;">שלום נועם,</div> 
+        </div>
+    </div>
 
     <script>
+        let player;
+        let currentVideoId = "";
         let startTime = 0;
         let endTime = 0;
-        const video = document.getElementById('gameVideo');
-        const scenes = []; // המערך שישמור את כל הסצנות שחתכת
+        let scenes = [];
+
+        // פונקציה לחילוץ ה-ID מתוך קישור יוטיוב
+        function extractVideoID(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        function loadYouTubeVideo() {
+            const url = document.getElementById('youtubeUrl').value;
+            const videoId = extractVideoID(url);
+            
+            if (!videoId) {
+                alert("לא הצלחתי לזהות קישור יוטיוב תקין. נסה שוב.");
+                return;
+            }
+
+            currentVideoId = videoId;
+            document.getElementById('video-container').style.display = 'block';
+            document.getElementById('editorPanel').style.display = 'block';
+
+            // אם הנגן כבר קיים, פשוט נטען סרטון חדש
+            if (player) {
+                player.loadVideoById(currentVideoId);
+            } else {
+                // יצירת נגן חדש
+                player = new YT.Player('ytplayer', {
+                    height: '360',
+                    width: '640',
+                    videoId: currentVideoId,
+                    playerVars: {
+                        'playsinline': 1,
+                        'controls': 1 // מציג את כפתורי השליטה של יוטיוב
+                    }
+                });
+            }
+            
+            loadSavedScenes();
+        }
 
         function markStartTime() {
-            startTime = video.currentTime;
-            document.getElementById('displayStart').innerText = startTime.toFixed(2) + "s";
+            if (player && player.getCurrentTime) {
+                startTime = player.getCurrentTime();
+                document.getElementById('displayStart').innerText = startTime.toFixed(2) + "s";
+            }
         }
 
         function markEndTime() {
-            endTime = video.currentTime;
-            document.getElementById('displayEnd').innerText = endTime.toFixed(2) + "s";
+            if (player && player.getCurrentTime) {
+                endTime = player.getCurrentTime();
+                document.getElementById('displayEnd').innerText = endTime.toFixed(2) + "s";
+            }
         }
 
         function saveScene() {
@@ -62,31 +148,47 @@
                 return;
             }
             if (text.trim() === "") {
-                alert("אנא הזן טקסט לקריאה עבור סצנה זו.");
+                alert("אנא הזן טקסט לקריאה.");
                 return;
             }
             
-            // יצירת אובייקט הסצנה
             const newScene = { 
-                id: scenes.length + 1,
+                id: Date.now(), 
                 start: startTime, 
                 end: endTime, 
                 text: text 
             };
             
             scenes.push(newScene);
+            saveToLocalStorage();
+            renderScenesList();
             
-            // עדכון התצוגה של הרשימה
-            const listItem = document.createElement('li');
-            listItem.innerHTML = `<strong>סצנה ${newScene.id}:</strong> ${newScene.start.toFixed(2)}s - ${newScene.end.toFixed(2)}s <br> טקסט: ${newScene.text}`;
-            document.getElementById('scenesList').appendChild(listItem);
-            
-            // איפוס שדות לקראת הסצנה הבאה
             document.getElementById('sceneText').value = '';
             document.getElementById('displayStart').innerText = '0';
             document.getElementById('displayEnd').innerText = '0';
-            
-            console.log("סצנות עדכניות:", scenes);
+        }
+
+        function saveToLocalStorage() {
+            let allData = JSON.parse(localStorage.getItem('ninjago_yt_data')) || {};
+            allData[currentVideoId] = scenes;
+            localStorage.setItem('ninjago_yt_data', JSON.stringify(allData));
+        }
+
+        function loadSavedScenes() {
+            let allData = JSON.parse(localStorage.getItem('ninjago_yt_data')) || {};
+            scenes = allData[currentVideoId] || [];
+            renderScenesList();
+        }
+
+        function renderScenesList() {
+            const list = document.getElementById('scenesList');
+            list.innerHTML = '';
+            scenes.forEach((scene, index) => {
+                const li = document.createElement('li');
+                li.style.marginBottom = "10px";
+                li.innerHTML = `<strong>סצנה ${index + 1}:</strong> ${scene.start.toFixed(1)}s - ${scene.end.toFixed(1)}s <br> <span style="font-family: 'Guttman Yad', cursive; font-size: 22px;">${scene.text}</span>`;
+                list.appendChild(li);
+            });
         }
     </script>
 </body>
