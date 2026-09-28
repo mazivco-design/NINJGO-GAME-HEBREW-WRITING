@@ -164,7 +164,7 @@
 
         /* אזור סצנות פנימי - מונע זום אאוט באייפד */
         #scenesListContainer {
-            max-height: 250px;
+            max-height: 350px;
             overflow-y: auto;
             background: #fff;
             border: 1px solid #ddd;
@@ -173,17 +173,12 @@
             margin-bottom: 15px;
         }
 
-        #scenesList {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
+        #scenesList { list-style: none; padding: 0; margin: 0; }
         #scenesList li {
-            margin-bottom: 10px;
-            padding-bottom: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
             border-bottom: 1px solid #eee;
-            word-wrap: break-word; /* שובר מילים ארוכות כדי לא למתוח את המסך */
+            word-wrap: break-word; 
             overflow-wrap: break-word;
             line-height: 1.6;
         }
@@ -222,10 +217,34 @@
         .time-display { font-family: monospace; font-size: 18px; font-weight: bold; }
         .time-controls-row { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
         .game-controls-container { display: flex; justify-content: center; margin: 20px 0; }
+
+        /* עיצוב חלונית האישור המותאמת אישית */
+        #customConfirmModal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 9999;
+            justify-content: center; align-items: center;
+        }
+        .confirm-box {
+            background: #fff; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px;
+            text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
     </style>
     <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
+
+<!-- חלונית אישור מותאמת אישית נגד חסימות -->
+<div id="customConfirmModal">
+    <div class="confirm-box">
+        <h3 id="confirmTitle" style="margin-top:0; color:#d32f2f;">אזהרה</h3>
+        <p id="confirmMsg" style="font-size: 18px; margin-bottom: 25px;">האם אתה בטוח?</p>
+        <div style="display:flex; gap:15px; justify-content:center;">
+            <button class="btn-action" style="background-color: #d32f2f;" id="btnConfirmYes">כן, בטוח</button>
+            <button class="btn-nav" style="background-color: #e0e0e0;" onclick="closeConfirmModal()">ביטול</button>
+        </div>
+    </div>
+</div>
 
 <div id="app-container">
     <div class="top-nav">
@@ -239,7 +258,7 @@
         <div class="control-group" style="background-color: #e3f2fd;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h3 style="margin: 0;">הפרויקטים שלי</h3>
-                <button class="btn-nav" onclick="startNewProject()" style="background-color: #fff; border: 2px solid #ffb300;">➕ פרויקט חדש ונקי</button>
+                <button class="btn-nav" onclick="startNewProject()" style="background-color: #fff; border: 2px solid #ffb300;">➕ פרויקט חדש</button>
             </div>
             <select id="projectSelect" onchange="loadSelectedProject()" style="margin-top: 15px;">
                 <option value="">-- בחר פרויקט קיים --</option>
@@ -264,18 +283,26 @@
             <div id="subtitleBlocker"></div> 
         </div>
 
+        <!-- כפתורי שליטה מהירה בסרטון שהוחזרו למצב עריכה -->
+        <div style="text-align: center; margin-bottom: 15px; background: #eee; padding: 10px; border-radius: 8px;">
+            <button class="btn-nav btn-small" onclick="seekRelative(-5)">⏪ אחורה 5 ש'</button>
+            <button class="btn-action btn-small" onclick="togglePlayPause()" style="margin: 0 10px;">⏯️ נגן / עצור</button>
+            <button class="btn-nav btn-small" onclick="seekRelative(5)">קדימה 5 ש' ⏩</button>
+        </div>
+
         <div class="control-group" style="border: 2px solid #673ab7;">
-            <h3 style="color: #673ab7; margin-top:0;">🚀 ייצור סצנות חכם (מתוך SRT)</h3>
-            <p style="font-size: 14px; margin-top:0; margin-bottom: 5px;">המערכת תמזג משפטים קצרים באופן אוטומטי:</p>
+            <h3 style="color: #673ab7; margin-top:0;">🚀 טעינת כתוביות (SRT)</h3>
+            <p style="font-size: 14px; margin-top:0; margin-bottom: 5px;">טען קובץ כדי לקבל זיהוי אוטומטי של טקסט בזמן צפייה, או כדי לייצר סצנות מרובות:</p>
             <div id="dropZone" class="drop-zone" onclick="document.getElementById('srtFileInput').click()">
                 <span id="dropZoneText">גרור קובץ או לחץ לבחירה 📁</span>
                 <input type="file" id="srtFileInput">
             </div>
-            <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות חכמות ⚡</button>
+            <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות מכל הקובץ ⚡</button>
         </div>
 
         <div class="control-group">
-            <h3>או: יצירת סצנה ידנית</h3>
+            <h3>או: יצירת סצנה באופן חופשי / מתוך הצפייה</h3>
+            <p style="font-size: 14px; margin-top:0;">אם טענת SRT, לחיצה על "סמן In" תמשוך את המשפט אוטומטית.</p>
             <div class="time-controls-row">
                 <button class="btn-action" onclick="markTime('start')">סמן In</button>
                 <button class="btn-small" onclick="adjustInTime(-1)">-1ש'</button>
@@ -307,10 +334,10 @@
             </div>
             
             <div style="margin-top: 10px;">
-                <label><input type="checkbox" id="chkShowInGame" checked style="transform: scale(1.5); margin-left: 10px;"> פעיל במשחק</label>
+                <label><input type="checkbox" id="chkShowInGame" style="transform: scale(1.5); margin-left: 10px;"> פעיל במשחק</label>
             </div>
             
-            <button class="btn-success btn-large" onclick="saveScene()">שמור סצנה</button>
+            <button class="btn-success btn-large" onclick="saveScene()">שמור סצנה ידנית</button>
         </div>
 
         <div class="control-group">
@@ -318,13 +345,11 @@
                 <h3 style="margin: 0;">סצנות בפרויקט:</h3>
             </div>
             
-            <!-- כפתורי מחיקה מתקדמים -->
             <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                <button class="btn-danger" style="flex: 1;" onclick="deleteAllScenesInProject()">מחק כל הסצנות בפרויקט 🗑️</button>
-                <button class="btn-danger" style="flex: 1; background-color: #b71c1c;" onclick="resetEntireSystem()">איפוס מערכת מלא ⚠️</button>
+                <button class="btn-danger" style="flex: 1;" onclick="deleteAllScenesInProject()">מחק כל הסצנות 🗑️</button>
+                <button class="btn-danger" style="flex: 1; background-color: #b71c1c;" onclick="resetEntireSystem()">איפוס מערכת ⚠️</button>
             </div>
 
-            <!-- אזור עם גלילה פנימית מונע זום אאוט -->
             <div id="scenesListContainer">
                 <ul id="scenesList"></ul>
             </div>
@@ -371,7 +396,7 @@
     let checkInterval = null;
     let ytPlayer = null;
     let ytReady = false;
-    let currentSrtFile = null;
+    let globalRawSrtClips = []; // מאגר הסצנות מה-SRT שיישלפו אוטומטית
 
     const ytElement = document.getElementById('youtubePlayer');
     const localElement = document.getElementById('localPlayer');
@@ -387,6 +412,23 @@
     const srtFileInput = document.getElementById('srtFileInput');
     let isDrawing = false;
 
+    // פונקציות החלונית המותאמת אישית (Custom Modal)
+    let confirmCallback = null;
+    function openConfirmModal(title, msg, callback) {
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmMsg').innerText = msg;
+        confirmCallback = callback;
+        document.getElementById('customConfirmModal').style.display = 'flex';
+    }
+    function closeConfirmModal() {
+        document.getElementById('customConfirmModal').style.display = 'none';
+        confirmCallback = null;
+    }
+    document.getElementById('btnConfirmYes').addEventListener('click', () => {
+        if (confirmCallback) confirmCallback();
+        closeConfirmModal();
+    });
+
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
     dropZone.addEventListener('drop', (e) => {
@@ -398,9 +440,42 @@
     });
 
     function handleSrtFile(file) {
-        currentSrtFile = file;
-        dropZoneText.innerText = "נבחר קובץ: " + file.name + " ✔️";
-        dropZone.style.backgroundColor = '#d1c4e9';
+        dropZoneText.innerText = "טוען... ⏳";
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const srtText = e.target.result.trim();
+            globalRawSrtClips = extractRawClips(srtText);
+            
+            if (globalRawSrtClips.length > 0) {
+                dropZoneText.innerText = "קובץ התרגום נטען בהצלחה ✔️ (" + globalRawSrtClips.length + " שורות)";
+                dropZone.style.backgroundColor = '#d1c4e9';
+            } else {
+                dropZoneText.innerText = "שגיאה בפיענוח הקובץ ❌";
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function extractRawClips(srtText) {
+        let clips = [];
+        const blocks = srtText.split(/\n\s*\n/);
+        blocks.forEach(block => {
+            const lines = block.split('\n');
+            if (lines.length >= 3) {
+                const timeLine = lines[1];
+                const textLines = lines.slice(2).join(' '); 
+                const timeMatch = timeLine.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3}) --> (\d{2}):(\d{2}):(\d{2}),(\d{3})/);
+                if (timeMatch) {
+                    const start = parseInt(timeMatch[1])*3600 + parseInt(timeMatch[2])*60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4])/1000;
+                    const end = parseInt(timeMatch[5])*3600 + parseInt(timeMatch[6])*60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8])/1000;
+                    let cleanText = textLines.replace(/<[^>]+>/g, '').replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').trim(); 
+                    if (cleanText.length > 1) { 
+                        clips.push({ start, end, text: cleanText });
+                    }
+                }
+            }
+        });
+        return clips;
     }
 
     function formatTime(seconds) {
@@ -424,7 +499,7 @@
         scenes = [];
         tempStart = 0;
         tempEnd = 0;
-        currentSrtFile = null;
+        globalRawSrtClips = [];
         
         document.getElementById('projectSelect').value = '';
         document.getElementById('projectNameInput').value = '';
@@ -432,6 +507,7 @@
         document.getElementById('sceneText').value = '';
         document.getElementById('editSceneId').value = '';
         document.getElementById('typeTyping').checked = true;
+        document.getElementById('chkShowInGame').checked = false;
         
         srtFileInput.value = '';
         dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
@@ -542,28 +618,55 @@
     }
 
     function getCurrentTime() {
-        if (videoType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime) return ytPlayer.getCurrentTime();
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') return ytPlayer.getCurrentTime();
         if (videoType === 'local') return localElement.currentTime;
         return 0;
     }
     function seekTo(time) {
-        if (videoType === 'youtube' && ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(time, true);
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.seekTo === 'function') ytPlayer.seekTo(time, true);
         if (videoType === 'local') localElement.currentTime = time;
     }
     function seekRelative(seconds) { seekTo(Math.max(0, getCurrentTime() + seconds)); }
+    
+    function togglePlayPause() {
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+            const state = ytPlayer.getPlayerState();
+            if (state === 1) ytPlayer.pauseVideo();
+            else ytPlayer.playVideo();
+        } else if (videoType === 'local') {
+            if (localElement.paused) localElement.play();
+            else localElement.pause();
+        }
+    }
+    
     function playVideo() {
-        if (videoType === 'youtube' && ytPlayer) ytPlayer.playVideo();
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
         if (videoType === 'local') localElement.play();
     }
     function pauseVideo() {
-        if (videoType === 'youtube' && ytPlayer) ytPlayer.pauseVideo();
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
         if (videoType === 'local') localElement.pause();
     }
+    
     function markTime(point) {
         const t = getCurrentTime();
-        if (point === 'start') { tempStart = t; tempEnd = t + 6; } else { tempEnd = t; }
+        if (point === 'start') { 
+            tempStart = t; 
+            tempEnd = t + 6; 
+            
+            // שליפה אוטומטית של הטקסט מתוך קובץ ה-SRT שנטען
+            if (globalRawSrtClips.length > 0) {
+                const match = globalRawSrtClips.find(c => t >= c.start - 0.5 && t <= c.end + 1.5);
+                if (match) {
+                    document.getElementById('sceneText').value = match.text;
+                }
+            }
+        } else { 
+            tempEnd = t; 
+        }
         updateTimeDisplay();
     }
+    
     function adjustInTime(seconds) {
         tempStart += seconds;
         if (tempStart < 0) tempStart = 0;
@@ -587,90 +690,50 @@
 
     function parseSRT() {
         if (!currentVideoId) { alert("חובה לטעון סרטון יוטיוב ולתת שם לפרויקט קודם."); return; }
-        if (!currentSrtFile) { alert("אנא בחר קובץ SRT או גרור אותו לאזור המיועד."); return; }
+        if (globalRawSrtClips.length === 0) { alert("אנא בחר קובץ SRT קודם."); return; }
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const srtText = e.target.result.trim();
-            if (!srtText) { alert("הקובץ נראה ריק."); return; }
+        const taskType = document.querySelector('input[name="taskType"]:checked').value;
+        const tracing = (taskType === 'tracing');
+        
+        let mergedScenes = [];
+        let currentMerge = null;
 
-            const blocks = srtText.split(/\n\s*\n/);
-            const taskType = document.querySelector('input[name="taskType"]:checked').value;
-            const tracing = (taskType === 'tracing');
-            
-            let rawClips = [];
-
-            blocks.forEach(block => {
-                const lines = block.split('\n');
-                if (lines.length >= 3) {
-                    const timeLine = lines[1];
-                    const textLines = lines.slice(2).join(' '); 
-
-                    const timeMatch = timeLine.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3}) --> (\d{2}):(\d{2}):(\d{2}),(\d{3})/);
-                    if (timeMatch) {
-                        const start = parseInt(timeMatch[1])*3600 + parseInt(timeMatch[2])*60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4])/1000;
-                        const end = parseInt(timeMatch[5])*3600 + parseInt(timeMatch[6])*60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8])/1000;
-                        
-                        let cleanText = textLines.replace(/<[^>]+>/g, '')
-                                                 .replace(/\[.*?\]/g, '')
-                                                 .replace(/\(.*?\)/g, '')
-                                                 .trim(); 
-
-                        if (cleanText.length > 1) { 
-                            rawClips.push({ start: start, end: end, text: cleanText });
-                        }
-                    }
-                }
-            });
-
-            let mergedScenes = [];
-            let currentMerge = null;
-
-            rawClips.forEach(clip => {
-                if (!currentMerge) {
+        globalRawSrtClips.forEach(clip => {
+            if (!currentMerge) {
+                currentMerge = { ...clip };
+            } else {
+                let timeGap = clip.start - currentMerge.end;
+                let wordCount = currentMerge.text.trim().split(/\s+/).length;
+                let hasPunctuation = /[.!?,;]$/.test(currentMerge.text.trim()) || /^[.!?,;]/.test(currentMerge.text.trim());
+                
+                if (timeGap > 1.5 || wordCount >= 6 || hasPunctuation) {
+                    mergedScenes.push(currentMerge);
                     currentMerge = { ...clip };
                 } else {
-                    let timeGap = clip.start - currentMerge.end;
-                    let wordCount = currentMerge.text.trim().split(/\s+/).length;
-                    let hasPunctuation = /[.!?,;]$/.test(currentMerge.text.trim()) || /^[.!?,;]/.test(currentMerge.text.trim());
-                    
-                    if (timeGap > 1.5 || wordCount >= 6 || hasPunctuation) {
-                        mergedScenes.push(currentMerge);
-                        currentMerge = { ...clip };
-                    } else {
-                        currentMerge.end = clip.end;
-                        currentMerge.text += " " + clip.text;
-                    }
+                    currentMerge.end = clip.end;
+                    currentMerge.text += " " + clip.text;
                 }
-            });
-            if (currentMerge) mergedScenes.push(currentMerge);
-
-            let newScenesCount = 0;
-            mergedScenes.forEach(sc => {
-                scenes.push({
-                    id: Date.now() + Math.random(),
-                    start: sc.start,
-                    end: sc.end,
-                    text: sc.text,
-                    tracing: tracing,
-                    show: true
-                });
-                newScenesCount++;
-            });
-
-            if (newScenesCount > 0) {
-                saveData();
-                currentSrtFile = null;
-                srtFileInput.value = ''; 
-                dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
-                dropZone.style.backgroundColor = '#f3e5f5';
-                alert("הצלחה! נוצרו " + newScenesCount + " סצנות חכמות אוטומטית.");
-            } else {
-                alert("שגיאה: לא הצלחתי לזהות פורמט SRT תקין בקובץ הזה.");
             }
-        };
-        
-        reader.readAsText(currentSrtFile);
+        });
+        if (currentMerge) mergedScenes.push(currentMerge);
+
+        let newScenesCount = 0;
+        mergedScenes.forEach(sc => {
+            scenes.push({
+                id: Date.now() + Math.random(),
+                start: sc.start,
+                end: sc.end,
+                text: sc.text,
+                tracing: tracing,
+                show: false // הסצנות נוצרות כבויות כברירת מחדל
+            });
+            newScenesCount++;
+        });
+
+        if (newScenesCount > 0) {
+            saveData();
+            alert("הצלחה! " + newScenesCount + " סצנות נוצרו. כעת סמן איזה מהן תרצה להפעיל במשחק.");
+        }
     }
 
     function saveScene() {
@@ -697,6 +760,7 @@
         saveData();
         document.getElementById('sceneText').value = "";
         document.getElementById('editSceneId').value = "";
+        document.getElementById('chkShowInGame').checked = false; // איפוס
     }
 
     function saveData() {
@@ -716,6 +780,22 @@
         renderScenes();
         populateProjectsList();
     }
+    
+    // שמירת נתונים זריזה ללא רינדור מחדש (למניעת קפיצות בעת סימון V)
+    function saveDataWithoutRender() {
+        let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
+        scenes.sort((a, b) => a.start - b.start);
+        allData[currentProjectName] = { videoId: currentVideoId, scenes: scenes };
+        localStorage.setItem('ninjagoData', JSON.stringify(allData));
+    }
+
+    function toggleSceneVisibility(id, isChecked) {
+        const sc = scenes.find(x => x.id === id);
+        if(sc) {
+            sc.show = isChecked;
+            saveDataWithoutRender();
+        }
+    }
 
     function editScene(id) {
         const s = scenes.find(x => x.id === id);
@@ -730,7 +810,7 @@
     }
 
     function deleteScene(id) {
-        if(confirm("למחוק סצנה זו?")) {
+        openConfirmModal("מחיקת סצנה", "האם אתה בטוח שברצונך למחוק סצנה זו?", () => {
             scenes = scenes.filter(x => x.id !== id);
             saveData();
             if (scenes.length === 0) {
@@ -739,32 +819,27 @@
                 localStorage.setItem('ninjagoData', JSON.stringify(allData));
                 startNewProject();
             }
-        }
+        });
     }
 
-    // --- כפתורי המחיקה והאיפוס החדשים ---
     function deleteAllScenesInProject() {
         if (!currentProjectName) { alert("לא נבחר פרויקט למחיקה."); return; }
-        if(confirm("האם אתה בטוח שברצונך למחוק את כל הסצנות בפרויקט '" + currentProjectName + "'? פעולה זו לא ניתנת לביטול.")) {
+        openConfirmModal("מחיקת פרויקט", "האם למחוק את כל הסצנות בפרויקט '" + currentProjectName + "'? הפעולה לא ניתנת לביטול.", () => {
             scenes = [];
             saveData();
             let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
             delete allData[currentProjectName];
             localStorage.setItem('ninjagoData', JSON.stringify(allData));
             startNewProject();
-            alert("כל הסצנות נמחקו והפרויקט אופס.");
-        }
+        });
     }
 
     function resetEntireSystem() {
-        if(confirm("⚠️ אזהרה חמורה! פעולה זו תמחק את כל הפרויקטים, הסרטונים והסצנות מהמערכת! האם להמשיך?")) {
-            if(confirm("האם אתה בטוח ב-100%? מחיקה זו היא סופית לחלוטין.")) {
-                localStorage.removeItem('ninjagoData');
-                startNewProject();
-                populateProjectsList();
-                alert("המערכת אופסה לחלוטין. דף נקי.");
-            }
-        }
+        openConfirmModal("איפוס מערכת", "⚠️ אזהרה חמורה! כל הסרטונים והסצנות יימחקו. הפעולה סופית. להמשיך?", () => {
+            localStorage.removeItem('ninjagoData');
+            startNewProject();
+            populateProjectsList();
+        });
     }
 
     function renderScenes() {
@@ -772,10 +847,23 @@
         ul.innerHTML = '';
         scenes.forEach((s, i) => {
             const li = document.createElement('li');
-            li.innerHTML = `<strong>סצנה ${i+1}:</strong> ${formatTime(s.start)} - ${formatTime(s.end)}<br> 
-                            "${s.text}" <br> ${s.tracing ? '✏️ טרייסינג' : '⌨️ הקלדה'} | 
-                            <button class="btn-action btn-small" onclick="editScene(${s.id})">ערוך</button>
-                            <button class="btn-danger btn-small" onclick="deleteScene(${s.id})">מחק</button>`;
+            li.innerHTML = `<div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div>
+                                    <strong>סצנה ${i+1}:</strong> ${formatTime(s.start)} - ${formatTime(s.end)}<br> 
+                                    "${s.text}" <br> 
+                                    <span style="font-size: 14px; color: #666;">${s.tracing ? '✏️ טרייסינג' : '⌨️ הקלדה'}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
+                                    <label style="cursor: pointer; font-weight: bold; color: #4CAF50; display: flex; align-items: center; gap: 8px;">
+                                        פעיל במשחק 
+                                        <input type="checkbox" onchange="toggleSceneVisibility(${s.id}, this.checked)" ${s.show ? 'checked' : ''} style="transform: scale(1.5);">
+                                    </label>
+                                    <div style="margin-top: 5px;">
+                                        <button class="btn-action btn-small" onclick="editScene(${s.id})">ערוך</button>
+                                        <button class="btn-danger btn-small" onclick="deleteScene(${s.id})">מחק</button>
+                                    </div>
+                                </div>
+                            </div>`;
             ul.appendChild(li);
         });
     }
