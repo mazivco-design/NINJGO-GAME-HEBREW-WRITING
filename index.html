@@ -6,7 +6,6 @@
     <title>משחק קריאה וכתיבה - נועם</title>
     
     <style>
-        /* טעינת פונט 'גברת לוין' ישירות מהשרת שלך */
         @font-face {
             font-family: 'GveretLevin';
             src: url('./GveretLevinAlefAlefAlef-Regular.woff2') format('woff2'),
@@ -45,19 +44,25 @@
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             transition: max-width 0.3s ease;
+            position: relative;
         }
         
-        #app-container.game-mode {
-            max-width: 95%; /* הרחבת המסך במצב משחק */
-        }
+        #app-container.game-mode { max-width: 95%; }
 
+        /* תפריט עליון דביק כדי שתמיד יהיה נגיש */
         .top-nav {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
-            padding-bottom: 15px;
+            padding: 15px 10px;
             border-bottom: 2px solid #eee;
+            position: sticky;
+            top: 0;
+            background-color: #fff;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border-radius: 8px;
         }
 
         button {
@@ -89,14 +94,9 @@
             transition: all 0.3s ease;
         }
         
-        .game-mode .video-wrapper {
-            width: 60%;
-            margin: 0 auto 15px auto;
-        }
-        
+        .game-mode .video-wrapper { width: 60%; margin: 0 auto 15px auto; }
         #youtubePlayer, #localPlayer { width: 100%; height: 100%; display: none; }
         
-        /* פס הסתרת הכתוביות */
         #subtitleBlocker {
             position: absolute;
             bottom: 45px; 
@@ -141,7 +141,6 @@
             border-radius: 6px; margin-top: 5px; font-family: inherit;
         }
 
-        /* עיצוב אזור הגרירה והבחירה */
         .drop-zone {
             display: flex;
             align-items: center;
@@ -161,16 +160,9 @@
             font-weight: bold;
         }
         
-        .drop-zone:hover, .drop-zone.dragover {
-            background-color: #e1bee7;
-        }
+        .drop-zone:hover, .drop-zone.dragover { background-color: #e1bee7; }
+        .drop-zone input[type="file"] { display: none; }
 
-        /* הסתרת כפתור הקובץ המקורי */
-        .drop-zone input[type="file"] {
-            display: none;
-        }
-
-        /* --- אזור המחברת והכתיבה --- */
         .notebook-area {
             position: relative;
             margin-top: 25px;
@@ -196,29 +188,11 @@
             outline: none;
         }
 
-        #fadedText { 
-            color: rgba(0, 0, 0, 0.15); 
-            pointer-events: none;
-        }
-        
-        #keyboardInput {
-            color: #000;
-            z-index: 6;
-        }
+        #fadedText { color: rgba(0, 0, 0, 0.15); pointer-events: none; }
+        #keyboardInput { color: #000; z-index: 6; }
+        #drawingCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; cursor: crosshair; }
 
-        #drawingCanvas {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 5;
-            cursor: crosshair;
-        }
-
-        .progress-bar {
-            text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 15px;
-            color: var(--secondary-color);
-        }
-
+        .progress-bar { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; color: var(--secondary-color); }
         .hidden { display: none !important; }
         .time-display { font-family: monospace; font-size: 18px; font-weight: bold; }
         .time-controls-row { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
@@ -251,7 +225,6 @@
             <h3>1. פרטי הפרויקט והסרטון</h3>
             <label>שם הפרויקט:</label>
             <input type="text" id="projectNameInput" placeholder="למשל: נינג'גו עונה 3 פרק 1" style="margin-bottom: 15px;">
-            
             <label>הדבק קישור יוטיוב:</label>
             <div style="display:flex; gap:10px; margin-bottom:15px;">
                 <input type="text" id="ytInput" placeholder="https://www.youtube.com/watch?v=...">
@@ -268,16 +241,13 @@
 
         <!-- אזור גרירה ולחיצה חכם להעלאת SRT -->
         <div class="control-group" style="border: 2px solid #673ab7;">
-            <h3 style="color: #673ab7; margin-top:0;">🚀 ייצור סצנות אוטומטי (מתוך SRT)</h3>
-            <p style="font-size: 14px; margin-top:0; margin-bottom: 5px;">גרור לכאן את הקובץ או לחץ לבחירה:</p>
-            
+            <h3 style="color: #673ab7; margin-top:0;">🚀 ייצור סצנות חכם (מתוך SRT)</h3>
+            <p style="font-size: 14px; margin-top:0; margin-bottom: 5px;">המערכת תמזג משפטים קצרים באופן אוטומטי:</p>
             <div id="dropZone" class="drop-zone" onclick="document.getElementById('srtFileInput').click()">
                 <span id="dropZoneText">גרור קובץ או לחץ לבחירה 📁</span>
-                <!-- השמטנו את חסימת ה-accept כדי שהאייפד לא יחסום כלום -->
                 <input type="file" id="srtFileInput">
             </div>
-
-            <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות אוטומטית ⚡</button>
+            <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות חכמות ⚡</button>
         </div>
 
         <div class="control-group">
@@ -322,6 +292,7 @@
         <div class="control-group">
             <h3>סצנות בפרויקט:</h3>
             <ul id="scenesList" style="line-height: 2;"></ul>
+            <button class="btn-nav btn-large" onclick="toggleMode()" style="margin-top: 20px;">מעבר למשחק 🎮</button>
         </div>
     </div>
 
@@ -374,34 +345,19 @@
     const canvas = document.getElementById('drawingCanvas');
     const ctx = canvas.getContext('2d');
     
-    // ניהול אזור הגרירה (Drag & Drop)
     const dropZone = document.getElementById('dropZone');
     const dropZoneText = document.getElementById('dropZoneText');
     const srtFileInput = document.getElementById('srtFileInput');
     let isDrawing = false;
 
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-
-    dropZone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-    });
-
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
     dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-            handleSrtFile(e.dataTransfer.files[0]);
-        }
+        e.preventDefault(); dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) handleSrtFile(e.dataTransfer.files[0]);
     });
-
     srtFileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            handleSrtFile(e.target.files[0]);
-        }
+        if (e.target.files.length > 0) handleSrtFile(e.target.files[0]);
     });
 
     function handleSrtFile(file) {
@@ -541,9 +497,7 @@
              } else {
                  scenes = allData[currentProjectName].scenes || [];
              }
-        } else {
-             scenes = []; 
-        }
+        } else { scenes = []; }
         
         renderScenes();
         populateProjectsList();
@@ -555,78 +509,62 @@
         if (videoType === 'local') return localElement.currentTime;
         return 0;
     }
-
     function seekTo(time) {
         if (videoType === 'youtube' && ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(time, true);
         if (videoType === 'local') localElement.currentTime = time;
     }
-
-    function seekRelative(seconds) {
-        const newTime = Math.max(0, getCurrentTime() + seconds);
-        seekTo(newTime);
-    }
-
+    function seekRelative(seconds) { seekTo(Math.max(0, getCurrentTime() + seconds)); }
     function playVideo() {
         if (videoType === 'youtube' && ytPlayer) ytPlayer.playVideo();
         if (videoType === 'local') localElement.play();
     }
-
     function pauseVideo() {
         if (videoType === 'youtube' && ytPlayer) ytPlayer.pauseVideo();
         if (videoType === 'local') localElement.pause();
     }
-
     function markTime(point) {
         const t = getCurrentTime();
-        if (point === 'start') {
-            tempStart = t;
-            tempEnd = t + 6; 
-        } else { tempEnd = t; }
+        if (point === 'start') { tempStart = t; tempEnd = t + 6; } else { tempEnd = t; }
         updateTimeDisplay();
     }
-
     function adjustInTime(seconds) {
         tempStart += seconds;
         if (tempStart < 0) tempStart = 0;
         if (tempStart >= tempEnd) tempEnd = tempStart + 1;
         updateTimeDisplay();
     }
-
     function adjustOutTime(seconds) {
         tempEnd += seconds;
         if (tempEnd <= tempStart) tempEnd = tempStart + 1;
         updateTimeDisplay();
     }
-
     function previewSelectedClip() {
         if (tempEnd <= tempStart) return;
         seekTo(tempStart);
         playVideo();
         if(checkInterval) clearInterval(checkInterval);
         checkInterval = setInterval(() => {
-            if (getCurrentTime() >= tempEnd) {
-                pauseVideo();
-                clearInterval(checkInterval);
-            }
+            if (getCurrentTime() >= tempEnd) { pauseVideo(); clearInterval(checkInterval); }
         }, 100);
     }
 
-    // פונקציית העלאת וקריאת קובץ SRT - מותאמת לגרירה ולחיצה
+    // פונקציית פיענוח SRT חכמה עם מיזוג משפטים
     function parseSRT() {
         if (!currentVideoId) { alert("חובה לטעון סרטון יוטיוב ולתת שם לפרויקט קודם."); return; }
         if (!currentSrtFile) { alert("אנא בחר קובץ SRT או גרור אותו לאזור המיועד."); return; }
 
         const reader = new FileReader();
-
         reader.onload = function(e) {
             const srtText = e.target.result.trim();
             if (!srtText) { alert("הקובץ נראה ריק."); return; }
 
             const blocks = srtText.split(/\n\s*\n/);
-            let newScenesCount = 0;
             const taskType = document.querySelector('input[name="taskType"]:checked').value;
             const tracing = (taskType === 'tracing');
+            
+            let rawClips = [];
 
+            // שלב 1: איסוף כל המקטעים מהקובץ וניקוי
             blocks.forEach(block => {
                 const lines = block.split('\n');
                 if (lines.length >= 3) {
@@ -638,31 +576,65 @@
                         const start = parseInt(timeMatch[1])*3600 + parseInt(timeMatch[2])*60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4])/1000;
                         const end = parseInt(timeMatch[5])*3600 + parseInt(timeMatch[6])*60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8])/1000;
                         
-                        const cleanText = textLines.replace(/<[^>]+>/g, '').trim(); 
+                        // ניקוי של תגיות כמו [מוזיקה] או (רעש)
+                        let cleanText = textLines.replace(/<[^>]+>/g, '')
+                                                 .replace(/\[.*?\]/g, '')
+                                                 .replace(/\(.*?\)/g, '')
+                                                 .trim(); 
 
                         if (cleanText.length > 1) { 
-                            scenes.push({
-                                id: Date.now() + Math.random(),
-                                start: start,
-                                end: end,
-                                text: cleanText,
-                                tracing: tracing,
-                                show: true
-                            });
-                            newScenesCount++;
+                            rawClips.push({ start: start, end: end, text: cleanText });
                         }
                     }
                 }
             });
 
+            // שלב 2: מיזוג משפטים חכם
+            let mergedScenes = [];
+            let currentMerge = null;
+
+            rawClips.forEach(clip => {
+                if (!currentMerge) {
+                    currentMerge = { ...clip };
+                } else {
+                    let timeGap = clip.start - currentMerge.end;
+                    let wordCount = currentMerge.text.trim().split(/\s+/).length;
+                    let hasPunctuation = /[.!?,;]$/.test(currentMerge.text.trim()) || /^[.!?,;]/.test(currentMerge.text.trim());
+                    
+                    // תנאי פיצול: פער זמנים, משפט ארוך, או סימן פיסוק
+                    if (timeGap > 1.5 || wordCount >= 6 || hasPunctuation) {
+                        mergedScenes.push(currentMerge);
+                        currentMerge = { ...clip };
+                    } else {
+                        // מיזוג לקליפ הנוכחי
+                        currentMerge.end = clip.end;
+                        currentMerge.text += " " + clip.text;
+                    }
+                }
+            });
+            if (currentMerge) mergedScenes.push(currentMerge);
+
+            // שלב 3: הוספת הסצנות הממוזגות למערכת
+            let newScenesCount = 0;
+            mergedScenes.forEach(sc => {
+                scenes.push({
+                    id: Date.now() + Math.random(),
+                    start: sc.start,
+                    end: sc.end,
+                    text: sc.text,
+                    tracing: tracing,
+                    show: true
+                });
+                newScenesCount++;
+            });
+
             if (newScenesCount > 0) {
                 saveData();
-                // איפוס האזור אחרי קליטה מוצלחת
                 currentSrtFile = null;
                 srtFileInput.value = ''; 
                 dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
                 dropZone.style.backgroundColor = '#f3e5f5';
-                alert("הצלחה! נוצרו " + newScenesCount + " סצנות חדשות אוטומטית.");
+                alert("הצלחה! נוצרו " + newScenesCount + " סצנות חכמות אוטומטית.");
             } else {
                 alert("שגיאה: לא הצלחתי לזהות פורמט SRT תקין בקובץ הזה.");
             }
@@ -705,14 +677,9 @@
         let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
         scenes.sort((a, b) => a.start - b.start);
         
-        allData[projName] = {
-            videoId: currentVideoId,
-            scenes: scenes
-        };
+        allData[projName] = { videoId: currentVideoId, scenes: scenes };
 
-        if (currentProjectName && currentProjectName !== projName) {
-            delete allData[currentProjectName];
-        }
+        if (currentProjectName && currentProjectName !== projName) { delete allData[currentProjectName]; }
         currentProjectName = projName;
 
         localStorage.setItem('ninjagoData', JSON.stringify(allData));
@@ -783,10 +750,7 @@
 
     function getActiveScenes() { return scenes.filter(s => s.show).sort((a,b) => a.start - b.start); }
 
-    function startGame() {
-        currentGameIndex = 0;
-        loadGameScene();
-    }
+    function startGame() { currentGameIndex = 0; loadGameScene(); }
 
     function loadGameScene() {
         const activeScenes = getActiveScenes();
@@ -879,14 +843,11 @@
         for (let i = 3; i < refData.length; i += 4) {
             if (refData[i] > 50) { 
                 targetPixels++;
-                if (userData[i] > 50) { 
-                    hitPixels++;
-                }
+                if (userData[i] > 50) { hitPixels++; }
             }
         }
         
         if (targetPixels === 0) return true; 
-        
         const overlapRatio = hitPixels / targetPixels;
         return overlapRatio > 0.25; 
     }
@@ -945,28 +906,14 @@
     }
 
     window.addEventListener('resize', () => { if (currentMode === 'game') resizeCanvas(); });
-
     function getPos(e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         return { x: clientX - rect.left, y: clientY - rect.top };
     }
-
-    function startDraw(e) {
-        e.preventDefault();
-        isDrawing = true;
-        const pos = getPos(e);
-        ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
-    }
-
-    function draw(e) {
-        if (!isDrawing) return;
-        e.preventDefault();
-        const pos = getPos(e);
-        ctx.lineTo(pos.x, pos.y); ctx.stroke();
-    }
-
+    function startDraw(e) { e.preventDefault(); isDrawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+    function draw(e) { if (!isDrawing) return; e.preventDefault(); const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
     function endDraw(e) { e.preventDefault(); isDrawing = false; ctx.closePath(); }
 
     canvas.addEventListener('mousedown', startDraw);
