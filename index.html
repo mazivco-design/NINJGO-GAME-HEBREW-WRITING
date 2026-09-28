@@ -141,11 +141,13 @@
             border-radius: 6px; margin-top: 5px; font-family: inherit;
         }
 
-        /* עיצוב שדה העלאת הקובץ */
-        input[type="file"] {
-            display: block;
+        /* עיצוב אזור הגרירה והבחירה */
+        .drop-zone {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             width: 100%;
-            padding: 15px;
+            padding: 25px;
             border: 2px dashed #673ab7;
             background-color: #f3e5f5;
             border-radius: 8px;
@@ -153,6 +155,19 @@
             margin-top: 10px;
             margin-bottom: 15px;
             font-size: 16px;
+            text-align: center;
+            transition: all 0.2s;
+            color: #512da8;
+            font-weight: bold;
+        }
+        
+        .drop-zone:hover, .drop-zone.dragover {
+            background-color: #e1bee7;
+        }
+
+        /* הסתרת כפתור הקובץ המקורי */
+        .drop-zone input[type="file"] {
+            display: none;
         }
 
         /* --- אזור המחברת והכתיבה --- */
@@ -163,7 +178,7 @@
             border-top: 2px solid var(--notebook-top);
             border-bottom: 4px solid var(--notebook-bottom);
             background: #fafafa;
-            overflow: visible; /* מאפשר לאותיות סופיות לרדת מתחת לקו בלי להיחתך */
+            overflow: visible; 
         }
 
         .notebook-text {
@@ -173,7 +188,7 @@
             text-align: center;
             width: 100%;
             position: absolute;
-            bottom: -20px; /* תיקון השורה המרחפת: מוריד את הטקסט לשבת על הקו */
+            bottom: -20px; 
             margin: 0;
             white-space: nowrap; 
             border: none;
@@ -251,11 +266,17 @@
             <div id="subtitleBlocker"></div> 
         </div>
 
-        <!-- מנגנון בחירת קובץ כתוביות חכם (תוקן להעלאת קובץ) -->
+        <!-- אזור גרירה ולחיצה חכם להעלאת SRT -->
         <div class="control-group" style="border: 2px solid #673ab7;">
             <h3 style="color: #673ab7; margin-top:0;">🚀 ייצור סצנות אוטומטי (מתוך SRT)</h3>
-            <p style="font-size: 14px; margin-top:0;">בחר את קובץ הכתוביות (SRT) שהורדת למכשיר:</p>
-            <input type="file" id="srtFileInput" accept=".srt, text/plain">
+            <p style="font-size: 14px; margin-top:0; margin-bottom: 5px;">גרור לכאן את הקובץ או לחץ לבחירה:</p>
+            
+            <div id="dropZone" class="drop-zone" onclick="document.getElementById('srtFileInput').click()">
+                <span id="dropZoneText">גרור קובץ או לחץ לבחירה 📁</span>
+                <!-- השמטנו את חסימת ה-accept כדי שהאייפד לא יחסום כלום -->
+                <input type="file" id="srtFileInput">
+            </div>
+
             <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות אוטומטית ⚡</button>
         </div>
 
@@ -342,6 +363,7 @@
     let checkInterval = null;
     let ytPlayer = null;
     let ytReady = false;
+    let currentSrtFile = null;
 
     const ytElement = document.getElementById('youtubePlayer');
     const localElement = document.getElementById('localPlayer');
@@ -351,7 +373,42 @@
     const appContainer = document.getElementById('app-container');
     const canvas = document.getElementById('drawingCanvas');
     const ctx = canvas.getContext('2d');
+    
+    // ניהול אזור הגרירה (Drag & Drop)
+    const dropZone = document.getElementById('dropZone');
+    const dropZoneText = document.getElementById('dropZoneText');
+    const srtFileInput = document.getElementById('srtFileInput');
     let isDrawing = false;
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            handleSrtFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    srtFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleSrtFile(e.target.files[0]);
+        }
+    });
+
+    function handleSrtFile(file) {
+        currentSrtFile = file;
+        dropZoneText.innerText = "נבחר קובץ: " + file.name + " ✔️";
+        dropZone.style.backgroundColor = '#d1c4e9';
+    }
 
     function formatTime(seconds) {
         if (isNaN(seconds) || seconds < 0) return "0:00";
@@ -374,14 +431,18 @@
         scenes = [];
         tempStart = 0;
         tempEnd = 0;
+        currentSrtFile = null;
         
         document.getElementById('projectSelect').value = '';
         document.getElementById('projectNameInput').value = '';
         document.getElementById('ytInput').value = '';
         document.getElementById('sceneText').value = '';
-        document.getElementById('srtFileInput').value = '';
         document.getElementById('editSceneId').value = '';
         document.getElementById('typeTyping').checked = true;
+        
+        srtFileInput.value = '';
+        dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
+        dropZone.style.backgroundColor = '#f3e5f5';
         
         updateTimeDisplay();
         renderScenes();
@@ -550,14 +611,11 @@
         }, 100);
     }
 
-    // פונקציית העלאת וקריאת קובץ SRT
+    // פונקציית העלאת וקריאת קובץ SRT - מותאמת לגרירה ולחיצה
     function parseSRT() {
         if (!currentVideoId) { alert("חובה לטעון סרטון יוטיוב ולתת שם לפרויקט קודם."); return; }
-        
-        const fileInput = document.getElementById('srtFileInput');
-        if (fileInput.files.length === 0) { alert("אנא בחר קובץ SRT מהמכשיר שלך."); return; }
+        if (!currentSrtFile) { alert("אנא בחר קובץ SRT או גרור אותו לאזור המיועד."); return; }
 
-        const file = fileInput.files[0];
         const reader = new FileReader();
 
         reader.onload = function(e) {
@@ -599,15 +657,18 @@
 
             if (newScenesCount > 0) {
                 saveData();
-                fileInput.value = ''; // איפוס השדה
+                // איפוס האזור אחרי קליטה מוצלחת
+                currentSrtFile = null;
+                srtFileInput.value = ''; 
+                dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
+                dropZone.style.backgroundColor = '#f3e5f5';
                 alert("הצלחה! נוצרו " + newScenesCount + " סצנות חדשות אוטומטית.");
             } else {
                 alert("שגיאה: לא הצלחתי לזהות פורמט SRT תקין בקובץ הזה.");
             }
         };
         
-        // מתחיל לקרוא את הקובץ כטקסט
-        reader.readAsText(file);
+        reader.readAsText(currentSrtFile);
     }
 
     function saveScene() {
