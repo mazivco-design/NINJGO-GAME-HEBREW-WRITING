@@ -141,6 +141,20 @@
             border-radius: 6px; margin-top: 5px; font-family: inherit;
         }
 
+        /* עיצוב שדה העלאת הקובץ */
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #673ab7;
+            background-color: #f3e5f5;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
         /* --- אזור המחברת והכתיבה --- */
         .notebook-area {
             position: relative;
@@ -237,11 +251,11 @@
             <div id="subtitleBlocker"></div> 
         </div>
 
-        <!-- מנגנון ייבוא כתוביות חכם -->
+        <!-- מנגנון בחירת קובץ כתוביות חכם (תוקן להעלאת קובץ) -->
         <div class="control-group" style="border: 2px solid #673ab7;">
             <h3 style="color: #673ab7; margin-top:0;">🚀 ייצור סצנות אוטומטי (מתוך SRT)</h3>
-            <p style="font-size: 14px; margin-top:0;">הדבק כאן את הטקסט מקובץ הכתוביות (SRT) שהורדת:</p>
-            <textarea id="srtInput" rows="4" dir="ltr" style="text-align:left;" placeholder="1&#10;00:00:04,000 --> 00:00:06,500&#10;שלום נועם..."></textarea>
+            <p style="font-size: 14px; margin-top:0;">בחר את קובץ הכתוביות (SRT) שהורדת למכשיר:</p>
+            <input type="file" id="srtFileInput" accept=".srt, text/plain">
             <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות אוטומטית ⚡</button>
         </div>
 
@@ -318,7 +332,7 @@
 <script>
     let currentMode = 'edit';
     let currentVideoId = null;
-    let currentProjectName = ""; // משתנה חדש לשם הפרויקט
+    let currentProjectName = ""; 
     let videoType = null;
     let scenes = [];
     let tempStart = 0;
@@ -365,7 +379,7 @@
         document.getElementById('projectNameInput').value = '';
         document.getElementById('ytInput').value = '';
         document.getElementById('sceneText').value = '';
-        document.getElementById('srtInput').value = '';
+        document.getElementById('srtFileInput').value = '';
         document.getElementById('editSceneId').value = '';
         document.getElementById('typeTyping').checked = true;
         
@@ -389,7 +403,7 @@
         Object.keys(allData).forEach(key => {
             const option = document.createElement('option');
             option.value = key;
-            option.innerText = key; // עכשיו מוצג שם הפרויקט במקום קוד היוטיוב
+            option.innerText = key; 
             select.appendChild(option);
         });
         if (currentVal && allData[currentVal]) select.value = currentVal;
@@ -402,13 +416,11 @@
         let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
         let projData = allData[selected];
 
-        // תאימות לאחור: אם הפרויקט הישן נשמר כמערך סצנות פשוט
         if (Array.isArray(projData)) {
             scenes = projData;
             currentVideoId = selected;
             currentProjectName = selected;
         } else {
-            // מבנה חדש: מכיל את מזהה הווידאו ומערך הסצנות
             scenes = projData.scenes || [];
             currentVideoId = projData.videoId;
             currentProjectName = selected;
@@ -461,7 +473,6 @@
             }
         }
         
-        // טעינת סצנות אם הפרויקט כבר קיים
         let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
         if (allData[currentProjectName]) {
              if(Array.isArray(allData[currentProjectName])) {
@@ -539,52 +550,64 @@
         }, 100);
     }
 
+    // פונקציית העלאת וקריאת קובץ SRT
     function parseSRT() {
         if (!currentVideoId) { alert("חובה לטעון סרטון יוטיוב ולתת שם לפרויקט קודם."); return; }
         
-        const srtText = document.getElementById('srtInput').value.trim();
-        if (!srtText) { alert("הדבק טקסט מקובץ ה-SRT."); return; }
+        const fileInput = document.getElementById('srtFileInput');
+        if (fileInput.files.length === 0) { alert("אנא בחר קובץ SRT מהמכשיר שלך."); return; }
 
-        const blocks = srtText.split(/\n\s*\n/);
-        let newScenesCount = 0;
-        const taskType = document.querySelector('input[name="taskType"]:checked').value;
-        const tracing = (taskType === 'tracing');
+        const file = fileInput.files[0];
+        const reader = new FileReader();
 
-        blocks.forEach(block => {
-            const lines = block.split('\n');
-            if (lines.length >= 3) {
-                const timeLine = lines[1];
-                const textLines = lines.slice(2).join(' '); 
+        reader.onload = function(e) {
+            const srtText = e.target.result.trim();
+            if (!srtText) { alert("הקובץ נראה ריק."); return; }
 
-                const timeMatch = timeLine.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3}) --> (\d{2}):(\d{2}):(\d{2}),(\d{3})/);
-                if (timeMatch) {
-                    const start = parseInt(timeMatch[1])*3600 + parseInt(timeMatch[2])*60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4])/1000;
-                    const end = parseInt(timeMatch[5])*3600 + parseInt(timeMatch[6])*60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8])/1000;
-                    
-                    const cleanText = textLines.replace(/<[^>]+>/g, '').trim(); 
+            const blocks = srtText.split(/\n\s*\n/);
+            let newScenesCount = 0;
+            const taskType = document.querySelector('input[name="taskType"]:checked').value;
+            const tracing = (taskType === 'tracing');
 
-                    if (cleanText.length > 1) { 
-                        scenes.push({
-                            id: Date.now() + Math.random(),
-                            start: start,
-                            end: end,
-                            text: cleanText,
-                            tracing: tracing,
-                            show: true
-                        });
-                        newScenesCount++;
+            blocks.forEach(block => {
+                const lines = block.split('\n');
+                if (lines.length >= 3) {
+                    const timeLine = lines[1];
+                    const textLines = lines.slice(2).join(' '); 
+
+                    const timeMatch = timeLine.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3}) --> (\d{2}):(\d{2}):(\d{2}),(\d{3})/);
+                    if (timeMatch) {
+                        const start = parseInt(timeMatch[1])*3600 + parseInt(timeMatch[2])*60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4])/1000;
+                        const end = parseInt(timeMatch[5])*3600 + parseInt(timeMatch[6])*60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8])/1000;
+                        
+                        const cleanText = textLines.replace(/<[^>]+>/g, '').trim(); 
+
+                        if (cleanText.length > 1) { 
+                            scenes.push({
+                                id: Date.now() + Math.random(),
+                                start: start,
+                                end: end,
+                                text: cleanText,
+                                tracing: tracing,
+                                show: true
+                            });
+                            newScenesCount++;
+                        }
                     }
                 }
-            }
-        });
+            });
 
-        if (newScenesCount > 0) {
-            saveData();
-            document.getElementById('srtInput').value = '';
-            alert("הצלחה! נוצרו " + newScenesCount + " סצנות חדשות אוטומטית.");
-        } else {
-            alert("שגיאה: לא הצלחתי לזהות פורמט SRT תקין בטקסט שהודבק.");
-        }
+            if (newScenesCount > 0) {
+                saveData();
+                fileInput.value = ''; // איפוס השדה
+                alert("הצלחה! נוצרו " + newScenesCount + " סצנות חדשות אוטומטית.");
+            } else {
+                alert("שגיאה: לא הצלחתי לזהות פורמט SRT תקין בקובץ הזה.");
+            }
+        };
+        
+        // מתחיל לקרוא את הקובץ כטקסט
+        reader.readAsText(file);
     }
 
     function saveScene() {
@@ -626,7 +649,6 @@
             scenes: scenes
         };
 
-        // מחיקת השם הישן מהזיכרון במקרה של שינוי שם פרויקט
         if (currentProjectName && currentProjectName !== projName) {
             delete allData[currentProjectName];
         }
