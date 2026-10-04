@@ -439,6 +439,15 @@
     let ytPlayer = null;
     let ytReady = false;
     let globalRawSrtClips = []; 
+    // [תיקון 3] טיימר ביטחון להשמעת משפט: אם הסרטון לא הגיע לסוף הקטע (למשל לא התחיל לנגן), השדה ישתחרר בכל זאת.
+    let audioSafetyTimer = null;
+
+    // [תיקון 2] מפתח נפרד ב-LocalStorage ששומר את שם הפרויקט האחרון שעבדת עליו.
+    // הוא לא נוגע במבנה של ninjagoData, ולכן פרויקטים קיימים ממשיכים לעבוד כרגיל.
+    const LAST_PROJECT_KEY = 'ninjagoLastProject';
+    // [תיקון 2] שני דגלים: הטעינה האוטומטית של הפרויקט האחרון רצה רק כשהדף נטען וגם נגן היוטיוב מוכן.
+    let domReady = false;
+    let lastProjectRestored = false;
 
     const ytElement = document.getElementById('youtubePlayer');
     const localElement = document.getElementById('localPlayer');
@@ -559,7 +568,29 @@
         document.getElementById('lblEnd').innerText = formatTime(tempEnd);
     }
 
-    function onYouTubeIframeAPIReady() { ytReady = true; populateProjectsList(); }
+    // [תיקון 2] כשנגן היוטיוב מוכן: ממלאים את רשימת הפרויקטים (רק אם הדף כבר נטען) ומנסים לטעון את הפרויקט האחרון.
+    function onYouTubeIframeAPIReady() {
+        ytReady = true;
+        if (domReady) populateProjectsList();
+        tryRestoreLastProject();
+    }
+
+    // [תיקון 2] טעינה אוטומטית של הפרויקט האחרון.
+    // רצה פעם אחת בלבד, ורק כששני התנאים מתקיימים: הדף נטען וגם נגן היוטיוב מוכן
+    // (הנגן נדרש כדי שהסרטון ייטען מיד בפתיחה).
+    function tryRestoreLastProject() {
+        if (lastProjectRestored || !domReady || !ytReady) return;
+        lastProjectRestored = true;
+
+        const last = localStorage.getItem(LAST_PROJECT_KEY);
+        if (!last) return;
+
+        const allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
+        if (!allData[last]) return; // הפרויקט כבר לא קיים (למשל נמחק)
+
+        document.getElementById('projectSelect').value = last;
+        loadSelectedProject();
+    }
 
     function startNewProject() {
         currentVideoId = null;
@@ -569,6 +600,10 @@
         tempStart = 0;
         tempEnd = 0;
         globalRawSrtClips = [];
+
+        // [תיקון 2] מצב "פרויקט חדש" או ריק: אין פרויקט אחרון לזכור.
+        // (ברגע שיישמר פרויקט חדש, saveData תרשום אותו מחדש.)
+        localStorage.removeItem(LAST_PROJECT_KEY);
         
         document.getElementById('projectSelect').value = '';
         document.getElementById('projectNameInput').value = '';
@@ -629,6 +664,9 @@
             globalRawSrtClips = projData.srtClips || []; 
             document.getElementById('chkBlockSubtitles').checked = projData.blockSubtitles !== false;
         }
+
+        // [תיקון 2] זוכרים שזה הפרויקט האחרון שנפתח, כדי לטעון אותו אוטומטית בפעם הבאה.
+        localStorage.setItem(LAST_PROJECT_KEY, selected);
 
         document.getElementById('projectNameInput').value = currentProjectName;
         videoType = currentVideoId.startsWith("YT_") ? 'youtube' : 'local';
@@ -758,59 +796,90 @@
         }, 100);
     }
 
+    // [תיקון 4] יצירת סצנות אוטומטית - גרסה חדשה: משפטים שלמים, קצרים ומבודדים.
+    // הרעיון: מחברים שורות כתוביות עד סימן סיום משפט (. ! ?), ואז שומרים רק משפטים שמתאימים לילד.
+    // הסצנות נוצרות כבויות ("פעיל במשחק" לא מסומן), כדי שתעבור עליהן ותדליק רק את הטובות.
     function parseSRT() {
         if (!currentVideoId) { alert("חובה לטעון סרטון יוטיוב ולתת שם לפרויקט קודם."); return; }
         if (globalRawSrtClips.length === 0) { alert("אנא בחר קובץ SRT קודם."); return; }
 
+        // אפשר לשנות את המספרים האלה כדי לקבל יותר או פחות סצנות:
+        const MIN_WORDS = 3;    // מינימום מילים במשפט
+        const MAX_WORDS = 8;    // מקסימום מילים במשפט
+        const MAX_SECONDS = 6;  // מקסימום אורך קטע בשניות (לפני הריווח)
+        const MAX_GAP = 1.5;    // שקט ארוך מזה (בשניות) נחשב סוף דיבור, ולא מחברים שורות מעבר אליו
+
         const taskType = document.querySelector('input[name="taskType"]:checked').value;
         const tracing = (taskType === 'tracing');
-        
-        let mergedScenes = [];
-        let currentMerge = null;
 
+        // שלב 1: מחברים שורות ליחידות, עד סימן סיום משפט
+        const SENTENCE_END = /[.!?]["'”’)]*$/;
+        let units = [];
+        let buf = null;
         globalRawSrtClips.forEach(clip => {
-            if (!currentMerge) {
-                currentMerge = { ...clip };
+            const text = clip.text.trim();
+            if (buf && clip.start - buf.end > MAX_GAP) {
+                buf.complete = false;   // נקטע באמצע (שקט ארוך): לא משפט שלם
+                units.push(buf);
+                buf = null;
+            }
+            if (!buf) {
+                buf = { start: clip.start, end: clip.end, text: text, complete: false };
             } else {
-                let timeGap = clip.start - currentMerge.end;
-                let wordCount = currentMerge.text.trim().split(/\s+/).length;
-                let hasPunctuation = /[.!?,;]$/.test(currentMerge.text.trim()) || /^[.!?,;]/.test(currentMerge.text.trim());
-                
-                if (timeGap > 1.5 || wordCount >= 6 || hasPunctuation) {
-                    mergedScenes.push(currentMerge);
-                    currentMerge = { ...clip };
-                } else {
-                    currentMerge.end = clip.end;
-                    currentMerge.text += " " + clip.text;
-                }
+                buf.end = clip.end;
+                // מילה שנחתכה בין שתי שורות (השורה הבאה מתחילה בגרש) מודבקת בחזרה בלי רווח
+                const glue = /^['׳’]/.test(text) ? '' : ' ';
+                buf.text += glue + text;
+            }
+            if (SENTENCE_END.test(text)) {
+                buf.complete = true;
+                units.push(buf);
+                buf = null;
             }
         });
-        if (currentMerge) mergedScenes.push(currentMerge);
+        if (buf) { buf.complete = false; units.push(buf); } // סוף הקובץ בלי סימן סיום
 
-        let newScenesCount = 0;
-        mergedScenes.forEach((sc, i) => {
-            let s = sc.start;
-            let e = sc.end;
-            
-            let prevEnd = (i > 0) ? mergedScenes[i-1].end : 0;
-            let nextStart = (i < mergedScenes.length - 1) ? mergedScenes[i+1].start : e + 5;
-            
+        // שלב 2: בודקים אילו יחידות מתאימות למשחק
+        const isGood = (u) => {
+            if (!u.complete) return false;
+            if (/(\.\.\.|…)["'”’)]*$/.test(u.text)) return false; // נגמר ב-"...": משפט שנקטע באמצע, לא משפט שלם
+            const words = u.text.split(/\s+/).filter(Boolean).length;
+            if (words < MIN_WORDS || words > MAX_WORDS) return false;
+            if (u.end - u.start > MAX_SECONDS) return false;
+            if (/[.!?]["'”’)]*\s+\S/.test(u.text)) return false; // כמה משפטים באותו קטע: אי אפשר להפריד ביניהם
+            return true;
+        };
+
+        // שלב 3: יוצרים סצנות רק מהיחידות המתאימות. הריווח (עד 0.4 ש') מחושב מול כל היחידות השכנות,
+        // גם אלה שלא נבחרו, כדי שהקטע לא יכלול חלק מדיבור אחר.
+        let created = 0;
+        units.forEach((u, i) => {
+            if (!isGood(u)) return;
+            let s = u.start;
+            let e = u.end;
+
+            let prevEnd = (i > 0) ? units[i-1].end : 0;
+            let nextStart = (i < units.length - 1) ? units[i+1].start : e + 5;
+
             if (s - prevEnd > 0.8) s -= 0.4;
-            else s = s - (s - prevEnd)/2; 
-            
+            else s = s - (s - prevEnd)/2;
+
             if (nextStart - e > 0.8) e += 0.4;
             else e = e + (nextStart - e)/2;
 
             scenes.push({
-                id: Date.now() + Math.random() + i, 
-                start: s, end: e, text: sc.text, tracing: tracing, show: false 
+                id: Date.now() + Math.random() + i,
+                start: s, end: e, text: u.text, tracing: tracing, show: false
             });
-            newScenesCount++;
+            created++;
         });
 
-        if (newScenesCount > 0) {
+        const skipped = units.length - created;
+        if (created > 0) {
             saveData();
-            alert("הצלחה! " + newScenesCount + " סצנות נוצרו. כעת סמן איזה מהן תרצה להפעיל במשחק.");
+            alert("נוצרו " + created + " סצנות מוצעות (כולן כבויות כרגע). דילגתי על " + skipped + " קטעים שלא מתאימים (קצרים, ארוכים או לא ברורים). סמן במשחק רק את אלה שאתה רוצה.");
+        } else {
+            alert("לא נמצאו משפטים מתאימים (3 עד 8 מילים, עם סימן סיום). אפשר לשנות את ההגדרות בראש הפונקציה parseSRT.");
         }
     }
 
@@ -859,6 +928,8 @@
         currentProjectName = projName;
 
         localStorage.setItem('ninjagoData', JSON.stringify(allData));
+        // [תיקון 2] כל שמירה מעדכנת גם את הפרויקט האחרון (גם אחרי שינוי שם פרויקט).
+        localStorage.setItem(LAST_PROJECT_KEY, projName);
         renderScenes();
         populateProjectsList();
     }
@@ -892,28 +963,26 @@
         document.getElementById('editSceneId').value = s.id;
     }
 
+    // [תיקון 1] מחיקת סצנה בודדת.
+    // בעבר: אם נמחקה הסצנה האחרונה, כל הפרויקט נמחק (כולל קישור הסרטון והכתוביות).
+    // עכשיו: נמחקת רק הסצנה, והפרויקט נשאר גם אם הרשימה התרוקנה.
     function deleteScene(id) {
         openConfirmModal("מחיקת סצנה", "האם אתה בטוח שברצונך למחוק סצנה זו?", () => {
             scenes = scenes.filter(x => x.id !== id);
             saveData();
-            if (scenes.length === 0) {
-                let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
-                delete allData[currentProjectName];
-                localStorage.setItem('ninjagoData', JSON.stringify(allData));
-                startNewProject();
-            }
         });
     }
 
+    // [תיקון 1] מחיקת כל הסצנות.
+    // בעבר: נמחק הפרויקט כולו (שם, קישור סרטון וכתוביות), ויצאת למסך ריק.
+    // עכשיו: נמחקות רק הסצנות. הסרטון, הכתוביות ושם הפרויקט נשארים,
+    // כך אפשר ליצור סצנות מחדש בלי להעלות הכול שוב.
+    // למחיקת פרויקט שלם קיים "איפוס מערכת".
     function deleteAllScenesInProject() {
         if (!currentProjectName) { alert("לא נבחר פרויקט למחיקה."); return; }
-        openConfirmModal("מחיקת פרויקט", "האם למחוק את כל הסצנות בפרויקט '" + currentProjectName + "'?", () => {
+        openConfirmModal("מחיקת סצנות", "האם למחוק את כל הסצנות בפרויקט '" + currentProjectName + "'? (הסרטון והכתוביות יישארו)", () => {
             scenes = [];
             saveData();
-            let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
-            delete allData[currentProjectName];
-            localStorage.setItem('ninjagoData', JSON.stringify(allData));
-            startNewProject();
         });
     }
 
@@ -1027,31 +1096,59 @@
             eraserBtn.classList.add('hidden');
             inputEl.value = "";
             inputEl.disabled = false;
+            unlockTypingInput(); // [תיקון 3] מחזיר את השדה למצב רגיל בכל סצנה חדשה
         }
     }
 
+    // [תיקון 3] נעילה ושחרור של שדה ההקלדה בזמן השמעת משפט.
+    // בעבר השתמשנו ב-disabled, ו-Safari באייפד לפעמים השאיר את המקלדת פתוחה או פתח אותה שוב.
+    // עכשיו: קודם הופכים את השדה לקריאה בלבד, מבקשים מ-iOS לא להציג מקלדת (inputmode none), ורק אז מסירים פוקוס.
+    function lockTypingInput() {
+        const el = document.getElementById('keyboardInput');
+        el.readOnly = true;
+        el.setAttribute('inputmode', 'none');
+        el.blur();
+    }
+    function unlockTypingInput() {
+        const el = document.getElementById('keyboardInput');
+        el.readOnly = false;
+        el.setAttribute('inputmode', 'text');
+    }
+
     function playAudioOnly() {
-        const inputEl = document.getElementById('keyboardInput');
-        inputEl.blur(); // מסיר פוקוס
-        inputEl.disabled = true; // נועל לחלוטין מניעת הקפצת מקלדת באייפד
+        lockTypingInput(); // [תיקון 3] במקום blur + disabled
         
         const scene = getActiveScenes()[currentGameIndex];
         playingAudioOnly = true;
+
+        // [תיקון 3] מוודאים שהנגן לא מושתק ושהעוצמה מלאה (לא מזיק אם כבר כך)
+        try {
+            if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.unMute === 'function') { ytPlayer.unMute(); ytPlayer.setVolume(100); }
+            if (videoType === 'local') localElement.muted = false;
+        } catch (err) {}
+
         seekTo(scene.start);
         playVideo();
         overlay.style.display = 'flex';
-        
+
         if(checkInterval) clearInterval(checkInterval);
+        if(audioSafetyTimer) clearTimeout(audioSafetyTimer);
+
+        // סיום ההשמעה: עוצרים, מסירים את המסך השחור ומשחררים את שדה ההקלדה
+        const finishAudio = () => {
+            clearInterval(checkInterval);
+            clearTimeout(audioSafetyTimer);
+            pauseVideo();
+            overlay.style.display = 'none';
+            playingAudioOnly = false;
+            seekTo(scene.start);
+            unlockTypingInput();
+        };
         checkInterval = setInterval(() => {
-            if (getCurrentTime() >= scene.end) {
-                pauseVideo();
-                overlay.style.display = 'none';
-                playingAudioOnly = false;
-                seekTo(scene.start);
-                clearInterval(checkInterval);
-                inputEl.disabled = false; // משחרר את הנעילה
-            }
+            if (getCurrentTime() >= scene.end) finishAudio();
         }, 100);
+        // [תיקון 3] רשת ביטחון: אם הסרטון לא התקדם (למשל לא התחיל לנגן), המסך לא נשאר תקוע
+        audioSafetyTimer = setTimeout(finishAudio, (scene.end - scene.start + 3) * 1000);
     }
 
     function onPlayerStateChange(event) {}
@@ -1145,6 +1242,7 @@
         const inputEl = document.getElementById('keyboardInput');
         inputEl.blur();
         inputEl.disabled = true; // נמנע מהמקלדת לקפוץ כשהסרטון מתנגן
+        if(audioSafetyTimer) clearTimeout(audioSafetyTimer); // [תיקון 3] שלא יפריע לסרטון הפרס
         
         seekTo(scene.start);
         playVideo();
@@ -1202,7 +1300,13 @@
     canvas.addEventListener('touchmove', draw, {passive: false});
     canvas.addEventListener('touchend', endDraw, {passive: false});
 
-    window.onload = populateProjectsList;
+    // [תיקון 2] כשהדף נטען: ממלאים את רשימת הפרויקטים ומנסים לטעון את הפרויקט האחרון.
+    // (הטעינה בפועל תתבצע רק כשגם נגן היוטיוב מוכן.)
+    window.onload = function() {
+        domReady = true;
+        populateProjectsList();
+        tryRestoreLastProject();
+    };
 </script>
 </body>
 </html>
