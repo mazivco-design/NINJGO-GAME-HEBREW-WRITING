@@ -21,7 +21,7 @@
             --secondary-color: #2196F3;
             --text-color: #333;
             --notebook-top: #ccc;
-            --notebook-bottom: #b0bec5; /* בהיר יותר לבקשתך */
+            --notebook-bottom: #b0bec5;
         }
 
         * { box-sizing: border-box; }
@@ -89,11 +89,10 @@
             background: #000;
             border-radius: 8px;
             overflow: hidden;
-            margin-bottom: 15px;
+            margin-bottom: 5px; /* הוקטן קצת כדי לפנות מקום לכתוביות לייב */
             transition: all 0.3s ease;
         }
         
-        /* חסימת הלחיצות על הווידאו במצב משחק */
         .game-mode .video-wrapper { 
             width: 60%; 
             margin: 0 auto 15px auto; 
@@ -110,11 +109,9 @@
             height: 18%; 
             background-color: #000;
             z-index: 5;
-            display: none;
+            display: none; /* נשלט כעת דרך JS לפי הצ'קבוקס */
             pointer-events: none; 
         }
-        
-        .game-mode #subtitleBlocker { display: block; }
 
         #audioOnlyOverlay {
             position: absolute;
@@ -128,6 +125,22 @@
             font-weight: bold;
             z-index: 10;
             display: none;
+        }
+        
+        #liveSubtitleDisplay {
+            min-height: 45px;
+            text-align: center;
+            font-size: 20px;
+            color: #512da8;
+            font-weight: bold;
+            padding: 10px;
+            background: #ede7f6;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px dashed #b39ddb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .panel { display: none; }
@@ -145,6 +158,7 @@
             width: 100%; padding: 12px; font-size: 16px; border: 1px solid #ccc;
             border-radius: 6px; margin-top: 5px; font-family: inherit;
         }
+        input:disabled { background-color: #f5f5f5; color: #999; }
 
         .drop-zone {
             display: flex;
@@ -188,11 +202,10 @@
             line-height: 1.6;
         }
 
-        /* עיצוב מחברת חדש - פותר את בעיית חיתוך האותיות הסופיות */
         .notebook-area {
             position: relative;
             margin-top: 25px;
-            height: 180px; /* הוגדל כדי לתת מקום לאותיות סופיות */
+            height: 180px; 
             border-top: 2px solid var(--notebook-top);
             background: #fafafa;
             overflow: visible; 
@@ -200,7 +213,7 @@
 
         .notebook-line {
             position: absolute;
-            bottom: 40px; /* הקו עצמו נמצא 40 פיקסלים מעל התחתית */
+            bottom: 40px; 
             left: 0;
             width: 100%;
             border-bottom: 4px solid var(--notebook-bottom);
@@ -209,12 +222,12 @@
 
         .notebook-text {
             font-family: 'GveretLevin', Arial, sans-serif !important;
-            font-size: clamp(60px, 10vw, 110px); /* הוגדל משמעותית */
+            font-size: clamp(60px, 10vw, 110px); 
             line-height: 1;
             text-align: center;
             width: 100%;
             position: absolute;
-            bottom: 20px; /* ממוקם יחסית לקו המחברת החדש */
+            bottom: 20px; 
             margin: 0;
             white-space: nowrap; 
             border: none;
@@ -287,6 +300,9 @@
                 <input type="text" id="ytInput" placeholder="https://www.youtube.com/watch?v=...">
                 <button class="btn-action" onclick="loadVideo('youtube')">טען סרטון</button>
             </div>
+            <label style="display:block; margin-top:10px;">
+                <input type="checkbox" id="chkBlockSubtitles" checked style="transform: scale(1.5); margin-left: 10px;"> הפעל הסתרת כתוביות (פס שחור) במשחק
+            </label>
         </div>
 
         <div class="video-wrapper">
@@ -295,6 +311,9 @@
             <div id="audioOnlyOverlay">🔊 משמיע סאונד בלבד...</div>
             <div id="subtitleBlocker"></div> 
         </div>
+        
+        <!-- תצוגת כתוביות חיה למסנכרן -->
+        <div id="liveSubtitleDisplay">-- תצוגת כתוביות חיה תופיע כאן --</div>
 
         <div style="text-align: center; margin-bottom: 15px; background: #eee; padding: 10px; border-radius: 8px;">
             <button class="btn-nav btn-small" onclick="seekRelative(-5)">⏪ אחורה 5 ש'</button>
@@ -385,8 +404,8 @@
         <div id="gameVideoPlaceholder"></div>
         
         <div class="game-controls-container">
-            <!-- מניעת דיפולט והורדת פוקוס כדי לא לפתוח מקלדת -->
-            <button class="btn-action" style="font-size: 20px; padding: 12px 30px;" id="btnPlayAudio" onclick="event.preventDefault(); playAudioOnly();">השמע משפט 🔊</button>
+            <!-- קורא ישירות לפונקציה, נטרול המקלדת נעשה בפנים -->
+            <button class="btn-action" style="font-size: 20px; padding: 12px 30px;" id="btnPlayAudio" onclick="playAudioOnly()">השמע משפט 🔊</button>
         </div>
 
         <div class="notebook-area" id="notebookArea">
@@ -398,6 +417,7 @@
 
         <div style="display:flex; gap: 10px; margin-top: 25px;">
             <button class="btn-success btn-large" style="margin-top:0;" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
+            <button class="btn-nav btn-large hidden" style="margin-top:0; flex-basis: 30%;" id="btnToggleEraser" onclick="toggleEraser()">מחק 🧽</button>
             <button class="btn-danger btn-large hidden" style="margin-top:0; flex-basis: 30%;" id="btnClearCanvas" onclick="resizeCanvas()">נקה לוח 🗑️</button>
         </div>
         
@@ -433,8 +453,18 @@
     const dropZoneText = document.getElementById('dropZoneText');
     const srtFileInput = document.getElementById('srtFileInput');
     let isDrawing = false;
+    let isEraser = false;
 
-    // פונקציות חלונית (Modal)
+    // לולאת הצגת כתוביות חיה למצב עריכה
+    setInterval(() => {
+        if (currentMode === 'edit' && globalRawSrtClips && globalRawSrtClips.length > 0) {
+            const t = getCurrentTime();
+            const match = globalRawSrtClips.find(c => t >= c.start && t <= c.end);
+            const display = document.getElementById('liveSubtitleDisplay');
+            if (display) display.innerText = match ? match.text : '--';
+        }
+    }, 200);
+
     let confirmCallback = null;
     function openConfirmModal(title, msg, callback) {
         document.getElementById('confirmTitle').innerText = title;
@@ -471,7 +501,7 @@
             if (globalRawSrtClips.length > 0) {
                 dropZoneText.innerText = "קובץ התרגום נטען בהצלחה ✔️ (" + globalRawSrtClips.length + " שורות)";
                 dropZone.style.backgroundColor = '#d1c4e9';
-                saveData(); // שומר את הקובץ ישירות בפרויקט
+                saveData(); 
             } else {
                 dropZoneText.innerText = "שגיאה בפיענוח הקובץ ❌";
             }
@@ -502,29 +532,18 @@
     }
 
     function shiftSrtTimes(amount) {
-        if (!globalRawSrtClips || globalRawSrtClips.length === 0) {
-            alert("אין קובץ כתוביות פעיל."); return;
-        }
-        globalRawSrtClips.forEach(c => {
-            c.start += amount;
-            c.end += amount;
-        });
-        saveData(); // שמירת השינוי בזיכרון הפרויקט
-        autoPullText(tempStart, tempEnd); // עדכון טקסט במידה ונבחרה סצנה
+        if (!globalRawSrtClips || globalRawSrtClips.length === 0) { alert("אין קובץ כתוביות פעיל."); return; }
+        globalRawSrtClips.forEach(c => { c.start += amount; c.end += amount; });
+        saveData(); 
+        autoPullText(tempStart, tempEnd); 
         alert(`סנכרון בוצע: הזמנים תוקנו ב-${amount} שניות.`);
     }
 
-    // פונקציה חכמה למשיכת טקסט בהתאם לזמן
     function autoPullText(tStart, tEnd) {
         if (globalRawSrtClips && globalRawSrtClips.length > 0) {
-            const matches = globalRawSrtClips.filter(c => 
-                (c.end > tStart && c.start < tEnd)
-            );
-            if (matches.length > 0) {
-                document.getElementById('sceneText').value = matches.map(m => m.text).join(' ');
-            } else {
-                document.getElementById('sceneText').value = '';
-            }
+            const matches = globalRawSrtClips.filter(c => (c.end > tStart && c.start < tEnd));
+            if (matches.length > 0) { document.getElementById('sceneText').value = matches.map(m => m.text).join(' '); } 
+            else { document.getElementById('sceneText').value = ''; }
         }
     }
 
@@ -558,6 +577,7 @@
         document.getElementById('editSceneId').value = '';
         document.getElementById('typeTyping').checked = true;
         document.getElementById('chkShowInGame').checked = false;
+        document.getElementById('chkBlockSubtitles').checked = true;
         
         srtFileInput.value = '';
         dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
@@ -601,11 +621,13 @@
             currentVideoId = selected;
             currentProjectName = selected;
             globalRawSrtClips = [];
+            document.getElementById('chkBlockSubtitles').checked = true;
         } else {
             scenes = projData.scenes || [];
             currentVideoId = projData.videoId;
             currentProjectName = selected;
-            globalRawSrtClips = projData.srtClips || []; // טעינת כתוביות שמורות
+            globalRawSrtClips = projData.srtClips || []; 
+            document.getElementById('chkBlockSubtitles').checked = projData.blockSubtitles !== false;
         }
 
         document.getElementById('projectNameInput').value = currentProjectName;
@@ -663,12 +685,11 @@
         }
         
         let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
-        if (allData[currentProjectName]) {
-             if(!Array.isArray(allData[currentProjectName])) {
-                 scenes = allData[currentProjectName].scenes || [];
-                 globalRawSrtClips = allData[currentProjectName].srtClips || [];
-             }
-        } else { scenes = []; globalRawSrtClips = []; }
+        if (allData[currentProjectName] && !Array.isArray(allData[currentProjectName])) {
+             scenes = allData[currentProjectName].scenes || [];
+             globalRawSrtClips = allData[currentProjectName].srtClips || [];
+             document.getElementById('chkBlockSubtitles').checked = allData[currentProjectName].blockSubtitles !== false;
+        } else { scenes = []; globalRawSrtClips = []; document.getElementById('chkBlockSubtitles').checked = true; }
         
         saveData();
     }
@@ -706,12 +727,8 @@
     
     function markTime(point) {
         const t = getCurrentTime();
-        if (point === 'start') { 
-            tempStart = t; 
-            tempEnd = t + 6; 
-        } else { 
-            tempEnd = t; 
-        }
+        if (point === 'start') { tempStart = t; tempEnd = t + 6; } 
+        else { tempEnd = t; }
         updateTimeDisplay();
         autoPullText(tempStart, tempEnd);
     }
@@ -741,7 +758,6 @@
         }, 100);
     }
 
-    // אלגוריתם סינון חכם לסצנות - נותן ריווח (Padding) כשאפשר כדי למנוע קטיעות
     function parseSRT() {
         if (!currentVideoId) { alert("חובה לטעון סרטון יוטיוב ולתת שם לפרויקט קודם."); return; }
         if (globalRawSrtClips.length === 0) { alert("אנא בחר קובץ SRT קודם."); return; }
@@ -776,7 +792,6 @@
             let s = sc.start;
             let e = sc.end;
             
-            // ריווח זמנים חכם: אם יש פער לדיבור הבא/קודם, אנחנו מתרחבים לתוכו
             let prevEnd = (i > 0) ? mergedScenes[i-1].end : 0;
             let nextStart = (i < mergedScenes.length - 1) ? mergedScenes[i+1].start : e + 5;
             
@@ -787,12 +802,8 @@
             else e = e + (nextStart - e)/2;
 
             scenes.push({
-                id: Date.now() + Math.random() + i, // זיהוי ייחודי לכל סצנה בלולאה
-                start: s,
-                end: e,
-                text: sc.text,
-                tracing: tracing,
-                show: false 
+                id: Date.now() + Math.random() + i, 
+                start: s, end: e, text: sc.text, tracing: tracing, show: false 
             });
             newScenesCount++;
         });
@@ -815,7 +826,7 @@
         if (text === "") { alert("חובה להזין טקסט לסצנה."); return; }
 
         const sceneObj = {
-            id: editId ? parseFloat(editId) : (Date.now() + Math.random()), // תוקן באג העריכה בעזרת parseFloat
+            id: editId ? parseFloat(editId) : (Date.now() + Math.random()), 
             start: tempStart, end: tempEnd, text: text, tracing: tracing, show: show
         };
 
@@ -840,7 +851,8 @@
         allData[projName] = { 
             videoId: currentVideoId, 
             scenes: scenes,
-            srtClips: globalRawSrtClips // שומרים את ה-SRT ברמת הפרויקט!
+            srtClips: globalRawSrtClips,
+            blockSubtitles: document.getElementById('chkBlockSubtitles').checked
         };
 
         if (currentProjectName && currentProjectName !== projName) { delete allData[currentProjectName]; }
@@ -854,7 +866,12 @@
     function saveDataWithoutRender() {
         let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
         scenes.sort((a, b) => a.start - b.start);
-        allData[currentProjectName] = { videoId: currentVideoId, scenes: scenes, srtClips: globalRawSrtClips };
+        allData[currentProjectName] = { 
+            videoId: currentVideoId, 
+            scenes: scenes, 
+            srtClips: globalRawSrtClips,
+            blockSubtitles: document.getElementById('chkBlockSubtitles').checked
+        };
         localStorage.setItem('ninjagoData', JSON.stringify(allData));
     }
 
@@ -890,7 +907,7 @@
 
     function deleteAllScenesInProject() {
         if (!currentProjectName) { alert("לא נבחר פרויקט למחיקה."); return; }
-        openConfirmModal("מחיקת פרויקט", "האם למחוק את כל הסצנות בפרויקט '" + currentProjectName + "'? הפעולה לא ניתנת לביטול.", () => {
+        openConfirmModal("מחיקת פרויקט", "האם למחוק את כל הסצנות בפרויקט '" + currentProjectName + "'?", () => {
             scenes = [];
             saveData();
             let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
@@ -938,13 +955,19 @@
         if (currentMode === 'edit') {
             if (scenes.filter(s => s.show).length === 0) { alert("אין סצנות פעילות למשחק פרויקט זה."); return; }
             currentMode = 'game';
+            
+            // שליטה בפס השחור לפי ההגדרה מהעריכה
+            const blocker = document.getElementById('subtitleBlocker');
+            blocker.style.display = document.getElementById('chkBlockSubtitles').checked ? 'block' : 'none';
+            
             document.getElementById('editPanel').classList.remove('active-panel');
             document.getElementById('gamePanel').classList.add('active-panel');
             appContainer.classList.add('game-mode');
             document.getElementById('mainTitle').innerText = "משחק קריאה";
             document.getElementById('modeToggleBtn').innerText = "חזור לעריכה ⚙️";
             gamePlaceholder.appendChild(editVideoWrapper);
-            startGame();
+            
+            setTimeout(() => { startGame(); }, 150);
         } else {
             currentMode = 'edit';
             document.getElementById('gamePanel').classList.remove('active-panel');
@@ -953,6 +976,7 @@
             document.getElementById('mainTitle').innerText = "מצב עריכה";
             document.getElementById('modeToggleBtn').innerText = "מעבר למשחק 🎮";
             document.getElementById('editPanel').insertBefore(editVideoWrapper, document.getElementById('editPanel').children[2]);
+            document.getElementById('subtitleBlocker').style.display = 'none'; // תמיד כבוי בעריכה
             pauseVideo();
         }
     }
@@ -976,13 +1000,16 @@
         document.getElementById('btnPlayAudio').classList.remove('hidden');
         document.getElementById('btnDoneWriting').classList.remove('hidden');
         
+        // תיקון ניגון סצנה לא נכונה: קופץ, מנגן רגע כדי לטעון פריים, ועוצר
         seekTo(scene.start);
-        setTimeout(pauseVideo, 300); 
+        playVideo();
+        setTimeout(pauseVideo, 400); 
         
         const faded = document.getElementById('fadedText');
         const canvasEl = document.getElementById('drawingCanvas');
         const inputEl = document.getElementById('keyboardInput');
         const clearBtn = document.getElementById('btnClearCanvas');
+        const eraserBtn = document.getElementById('btnToggleEraser');
         
         if (scene.tracing) {
             faded.innerText = scene.text;
@@ -990,19 +1017,23 @@
             canvasEl.classList.remove('hidden');
             inputEl.classList.add('hidden');
             clearBtn.classList.remove('hidden');
-            resizeCanvas();
+            eraserBtn.classList.remove('hidden');
+            setTimeout(resizeCanvas, 50); // השהיה קלה לחישוב מדויק של המסך למניעת תקיעת העט
         } else {
             faded.classList.add('hidden');
             canvasEl.classList.add('hidden');
             inputEl.classList.remove('hidden');
             clearBtn.classList.add('hidden');
+            eraserBtn.classList.add('hidden');
             inputEl.value = "";
+            inputEl.disabled = false;
         }
     }
 
     function playAudioOnly() {
-        // מונע את פתיחת המקלדת באייפד
-        if (document.activeElement) document.activeElement.blur();
+        const inputEl = document.getElementById('keyboardInput');
+        inputEl.blur(); // מסיר פוקוס
+        inputEl.disabled = true; // נועל לחלוטין מניעת הקפצת מקלדת באייפד
         
         const scene = getActiveScenes()[currentGameIndex];
         playingAudioOnly = true;
@@ -1018,6 +1049,7 @@
                 playingAudioOnly = false;
                 seekTo(scene.start);
                 clearInterval(checkInterval);
+                inputEl.disabled = false; // משחרר את הנעילה
             }
         }, 100);
     }
@@ -1027,6 +1059,24 @@
     function normalizeHebrew(text) {
         let clean = text.replace(/[\u0591-\u05C7\s\p{P}]/gu, ''); 
         return clean.replace(/ם/g, 'מ').replace(/ן/g, 'נ').replace(/ץ/g, 'צ').replace(/ף/g, 'פ').replace(/ך/g, 'כ');
+    }
+
+    function toggleEraser() {
+        isEraser = !isEraser;
+        const btn = document.getElementById('btnToggleEraser');
+        if (isEraser) {
+            btn.innerText = "חזור לעט ✏️";
+            btn.classList.add('btn-action');
+            btn.classList.remove('btn-nav');
+            ctx.globalCompositeOperation = 'destination-out'; // מצב מחיקה
+            ctx.lineWidth = 25; 
+        } else {
+            btn.innerText = "מחק 🧽";
+            btn.classList.add('btn-nav');
+            btn.classList.remove('btn-action');
+            ctx.globalCompositeOperation = 'source-over'; // מצב ציור
+            ctx.lineWidth = 6;
+        }
     }
 
     function validateTracing() {
@@ -1042,8 +1092,9 @@
         hCtx.font = style.fontSize + " 'GveretLevin', Arial";
         hCtx.textAlign = "center";
         
-        hCtx.textBaseline = "alphabetic";
-        const textY = canvas.height - 20; // מותאם למיקום הקו החדש
+        // יישור מדויק כדי שהבדיקה תחפוף ב-100% למה שהילד רואה
+        hCtx.textBaseline = "bottom"; 
+        const textY = canvas.height - 20; 
         hCtx.fillText(scene.text, canvas.width / 2, textY);
         
         const refData = hCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height).data;
@@ -1061,7 +1112,8 @@
         
         if (targetPixels === 0) return true; 
         const overlapRatio = hitPixels / targetPixels;
-        return overlapRatio > 0.25; 
+        // הורדת הסף ל-15% כדי להיות סלחניים לילד שמצייר באצבע
+        return overlapRatio > 0.15; 
     }
 
     function checkTask() {
@@ -1087,8 +1139,12 @@
         const scene = getActiveScenes()[currentGameIndex];
         document.getElementById('btnDoneWriting').classList.add('hidden');
         document.getElementById('btnClearCanvas').classList.add('hidden');
+        document.getElementById('btnToggleEraser').classList.add('hidden');
         document.getElementById('btnPlayAudio').classList.add('hidden');
-        document.getElementById('keyboardInput').blur();
+        
+        const inputEl = document.getElementById('keyboardInput');
+        inputEl.blur();
+        inputEl.disabled = true; // נמנע מהמקלדת לקפוץ כשהסרטון מתנגן
         
         seekTo(scene.start);
         playVideo();
@@ -1111,6 +1167,16 @@
             canvas.width = area.offsetWidth;
             canvas.height = area.offsetHeight;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // איפוס הגדרות ציור
+            isEraser = false;
+            const btn = document.getElementById('btnToggleEraser');
+            if(btn) {
+                btn.innerText = "מחק 🧽";
+                btn.classList.add('btn-nav');
+                btn.classList.remove('btn-action');
+            }
+            ctx.globalCompositeOperation = 'source-over';
             ctx.lineWidth = 6; 
             ctx.lineCap = 'round';
             ctx.strokeStyle = '#000000';
