@@ -47,7 +47,10 @@
             position: relative;
         }
         
-        #app-container.game-mode { max-width: 95%; }
+        #app-container.game-mode { max-width: 100%; padding: 8px 12px; }
+        body.game-active { padding: 6px; }
+        /* [תיקון 16] במשחק אין שורת כותרת עליונה: יותר מקום לסרטון ולכתיבה (כפתור היציאה נמצא בעמודת הכפתורים) */
+        .game-mode .top-nav { display: none; }
 
         .top-nav {
             display: flex;
@@ -93,11 +96,15 @@
             transition: all 0.3s ease;
         }
         
+        /* [תיקון 16] במשחק גובה ורוחב הסרטון מחושבים בקוד (layoutGame) לפי גודל המסך */
         .game-mode .video-wrapper { 
-            width: 60%; 
-            margin: 0 auto 15px auto; 
+            width: auto;
+            max-width: 100%;
+            margin: 0;
+            transition: none;
             pointer-events: none; 
         }
+        .game-mode .notebook-area { margin-top: 6px; }
         
         #youtubePlayer, #localPlayer { width: 100%; height: 100%; display: none; }
         
@@ -261,21 +268,34 @@
             background: #fff; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px;
             text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
-        /* [תיקון 11] שורת הכפתורים העליונה במשחק */
-        #gameToolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 15px; }
-        .game-btn { font-size: 20px; padding: 12px 22px; min-height: 56px; }
-        /* [תיקון 12] מקלדת עברית קבועה בתוך הדף */
-        #onScreenKeyboard { margin-top: 15px; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-        #kbLetters { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; }
-        .kb-key { padding: 0; height: 64px; font-size: 32px; font-family: Arial, sans-serif; background: #fff; border: 2px solid #90a4ae; border-radius: 10px; color: #263238; }
+        /* [תיקון 16] פריסת המשחק לרוחב: עמודת כפתורים בצד ימין, הסרטון משמאל, אזור הכתיבה והמקלדת מתחת */
+        #gameTop { display: flex; gap: 12px; align-items: stretch; margin-bottom: 8px; }
+        #gameSide { flex: none; width: 190px; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+        #gameSide .progress-bar { margin: 0; font-size: 17px; }
+        .game-btn { width: 100%; font-size: 18px; padding: 6px 10px; min-height: 44px; }
+        #gameVideoPlaceholder { flex: 1; min-width: 0; display: flex; justify-content: center; align-items: center; }
+        .playing-video #notebookArea, .playing-video #onScreenKeyboard { visibility: hidden; }
+        /* [תיקון 12] מקלדת עברית קבועה בתוך הדף, בסידור מקלדת רגילה */
+        #onScreenKeyboard { margin: 8px auto 0; max-width: 820px; direction: ltr; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+        .kb-row { display: flex; gap: 6px; margin-bottom: 6px; }
+        .kb-key { flex: 1 1 0; min-width: 0; padding: 0; height: var(--kb-h, 46px); font-size: 26px; font-family: Arial, sans-serif; background: #fff; border: 2px solid #90a4ae; border-radius: 8px; color: #263238; }
         .kb-key:active { background: #bbdefb; }
-        #kbBottomRow { display: flex; gap: 8px; margin-top: 8px; }
-        #kbSpace { flex: 3; }
-        #kbBackspace { flex: 1; background: #ffcdd2; }
+        .kb-wide { flex: 1.8 1 0; }
+        .kb-space { flex: 6 1 0; }
+        .kb-back { background: #ffcdd2; }
+        /* תצוגת הטקסט שהילד כותב, עם סמן שאפשר להזיז */
+        #typedDisplay { color: #000; font-family: Arial, sans-serif !important; font-size: clamp(44px, 6.5vw, 76px); white-space: pre; pointer-events: auto; cursor: text; user-select: none; -webkit-user-select: none; }
+        #typedDisplay .caret { display: inline-block; width: 3px; height: 0.95em; background: #2196F3; vertical-align: -0.1em; animation: blink 1s steps(1) infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
         /* [תיקון 13] תיבת הרמז */
         #hintBox { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; background: #fffde7; border: 3px solid #ffb300; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10px; font-family: Arial, sans-serif; font-size: clamp(32px, 6vw, 56px); font-weight: bold; color: #1565c0; }
-        /* בתרגיל הקלדה הסרטון קטן יותר, כדי שהמקלדת תיכנס במסך */
-        .game-mode.typing-task .video-wrapper { width: 38%; }
+        /* [תיקון 18] חלונות דיווח על טעות וסקירת סצנות */
+        #reportModal, #reviewModal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 9999;
+            justify-content: center; align-items: center;
+        }
         /* [תיקון 9] חלון הודעות מעוצב בתוך הדף, במקום alert של Safari */
         #customMessageModal {
             display: none;
@@ -305,6 +325,46 @@
         <h3 id="messageTitle" style="margin-top:0; color:#2196F3; font-size: 28px;"></h3>
         <p id="messageText" style="font-size: 22px; margin-bottom: 25px;"></p>
         <button class="btn-success btn-large" style="margin-top:0;" id="btnMessageOk">אישור</button>
+    </div>
+</div>
+
+<!-- [תיקון 18] חלון דיווח על טעות (לילד) -->
+<div id="reportModal">
+    <div class="confirm-box">
+        <h3 style="margin-top:0; color:#e65100; font-size: 26px;">🚩 יש טעות במשפט?</h3>
+        <p id="reportText" style="font-size: 19px;"></p>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="btn-success" id="btnReportWithText" style="font-size:20px;"></button>
+            <button class="btn-action" id="btnReportPlain" style="font-size:20px;">דווח על הטעות</button>
+            <button class="btn-nav" id="btnReportCancel" style="background:#e0e0e0; font-size:20px;">ביטול</button>
+        </div>
+    </div>
+</div>
+
+<!-- [תיקון 18] חלון סקירת סצנות (להורה) -->
+<div id="reviewModal">
+    <div class="confirm-box" style="max-width: 640px; text-align: right;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+            <h3 style="margin:0;" id="reviewTitle">סקירה</h3>
+            <button class="btn-nav btn-small" onclick="closeReview()">✖ סגור</button>
+        </div>
+        <div id="reviewTimes" style="margin-bottom: 8px; font-family: monospace; font-size: 18px; direction: ltr; text-align: right;"></div>
+        <textarea id="reviewText" rows="3" style="direction: rtl; font-size: 24px;"></textarea>
+        <div id="reviewSuggestions" style="margin-top: 6px;"></div>
+        <div style="display:flex; gap:6px; flex-wrap: wrap; margin-top: 10px; align-items:center;">
+            <button class="btn-action" onclick="reviewPlay()">▶ נגן</button>
+            <span>התחלה:</span>
+            <button class="btn-nav btn-small" onclick="reviewNudge('start', -0.1)">−0.1</button>
+            <button class="btn-nav btn-small" onclick="reviewNudge('start', 0.1)">+0.1</button>
+            <span>סיום:</span>
+            <button class="btn-nav btn-small" onclick="reviewNudge('end', -0.1)">−0.1</button>
+            <button class="btn-nav btn-small" onclick="reviewNudge('end', 0.1)">+0.1</button>
+        </div>
+        <label style="display:block; margin-top: 10px; cursor: pointer;"><input type="checkbox" id="reviewActive" style="transform: scale(1.5); margin-left: 10px;"> פעיל במשחק</label>
+        <div style="display:flex; gap:8px; margin-top: 12px;">
+            <button class="btn-nav" style="flex:1;" onclick="reviewStep(-1)">הקודמת ▶</button>
+            <button class="btn-success" style="flex:2;" onclick="reviewSaveNext()">◀ שמור והבאה</button>
+        </div>
     </div>
 </div>
 
@@ -339,6 +399,10 @@
             <label style="display:block; margin-top:10px;">
                 <input type="checkbox" id="chkBlockSubtitles" checked style="transform: scale(1.5); margin-left: 10px;"> הפעל הסתרת כתוביות (פס שחור) במשחק
             </label>
+            <!-- [תיקון 19] ניגון מלא: הסרטון מתנגן ברצף ונעצר רק בנקודות התרגילים -->
+            <label style="display:block; margin-top:10px;">
+                <input type="checkbox" id="chkFullPlay" style="transform: scale(1.5); margin-left: 10px;" onchange="saveSettingsIfProject()"> ניגון מלא של הסרטון במשחק (הסרטון מתנגן עד התרגיל, ואחרי תשובה נכונה ממשיך עד התרגיל הבא)
+            </label>
         </div>
 
         <div class="video-wrapper">
@@ -372,6 +436,14 @@
                     <button class="btn-nav btn-small" onclick="shiftSrtTimes(0.5)">איחור (+0.5 ש') ⏩</button>
                 </div>
             </div>
+
+            <!-- [תיקון 20] מילון תיקונים לתמלול -->
+            <details style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
+                <summary style="font-weight: bold; cursor: pointer;">🔧 מילון תיקונים (מתקן מילים שהתמלול טועה בהן)</summary>
+                <p style="font-size: 14px; margin: 8px 0;">שורה לכל תיקון, בצורה: <b>מילה שגויה=מילה נכונה</b>. התיקונים חלים על כל הפרויקטים ועל קבצי SRT חדשים.</p>
+                <textarea id="correctionsInput" rows="5" placeholder="שגוי=נכון" style="direction: rtl;"></textarea>
+                <button class="btn-action btn-small" style="margin-top: 8px;" onclick="saveAndApplyCorrections()">שמור והחל על הסצנות והכתוביות 🔧</button>
+            </details>
 
             <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות מכל הקובץ ⚡</button>
         </div>
@@ -426,6 +498,12 @@
                 <button class="btn-danger" style="flex: 1; background-color: #b71c1c;" onclick="resetEntireSystem()">איפוס מערכת ⚠️</button>
             </div>
 
+            <!-- [תיקון 18] סקירת סצנות וסינון סצנות שהילד דיווח עליהן -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center;">
+                <button class="btn-nav" style="flex: 1;" onclick="openReview()">🔍 סקירת סצנות</button>
+                <label style="flex: 1; cursor: pointer;"><input type="checkbox" id="chkOnlyReported" onchange="renderScenes()" style="transform: scale(1.4); margin-left: 8px;"> הצג רק סצנות שדווחו 🚩 <span id="reportedCount"></span></label>
+            </div>
+
             <div id="scenesListContainer">
                 <ul id="scenesList"></ul>
             </div>
@@ -436,35 +514,34 @@
 
     <!-- ================= מצב משחק ================= -->
     <div id="gamePanel" class="panel">
-        <div class="progress-bar" id="gameProgress" style="margin-bottom:10px;">סצנה 1 מתוך 5</div>
-
-        <!-- [תיקון 11] כל כפתורי המשחק בשורה אחת למעלה. המאזינים של "השמע משפט" ו"רמז" מוגדרים בסקריפט -->
-        <div id="gameToolbar">
-            <button class="btn-action game-btn" id="btnPlayAudio">השמע משפט 🔊</button>
-            <button class="btn-nav game-btn hidden" id="btnHint">💡 רמז</button>
-            <button class="btn-nav game-btn hidden" id="btnToggleEraser" onclick="toggleEraser()">מחק 🧽</button>
-            <button class="btn-danger game-btn hidden" id="btnClearCanvas" onclick="resizeCanvas()">נקה לוח 🗑️</button>
-            <button class="btn-success game-btn" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
+        <!-- [תיקון 16] עמודת כפתורים בצד ימין והסרטון משמאל. המאזינים של הכפתורים מוגדרים בסקריפט -->
+        <div id="gameTop">
+            <div id="gameSide">
+                <div class="progress-bar" id="gameProgress">סצנה 1 מתוך 5</div>
+                <button class="btn-action game-btn" id="btnPlayAudio">השמע משפט 🔊</button>
+                <button class="btn-nav game-btn hidden" id="btnHint">💡 רמז</button>
+                <button class="btn-nav game-btn hidden" id="btnToggleEraser" onclick="toggleEraser()">מחק 🧽</button>
+                <button class="btn-danger game-btn hidden" id="btnClearCanvas" onclick="resizeCanvas()">נקה לוח 🗑️</button>
+                <button class="btn-success game-btn" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
+                <button class="btn-nav game-btn" id="btnReport" style="background-color:#ffe0b2;">🚩 יש טעות</button>
+                <button class="btn-nav game-btn hidden" id="btnSkipPlay">⏭ דלג להמשך</button>
+                <button class="game-btn" id="btnExitGame" style="background-color:#e0e0e0;" onclick="toggleMode()">⚙️ חזור לעריכה</button>
+            </div>
+            <div id="gameVideoPlaceholder"></div>
         </div>
-
-        <div id="gameVideoPlaceholder"></div>
         
         <div class="notebook-area" id="notebookArea">
             <div class="notebook-line"></div>
             <div id="fadedText" class="notebook-text hidden"></div>
             <canvas id="drawingCanvas" class="hidden"></canvas>
-            <input type="text" id="keyboardInput" class="notebook-text hidden" placeholder="" autocomplete="off" autocorrect="off" spellcheck="false" dir="rtl" readonly inputmode="none">
+            <!-- [תיקון 17] הטקסט שהילד כותב מוצג כאן (עם סמן). השדה הנסתר מחזיק את הערך לבדיקה -->
+            <div id="typedDisplay" class="notebook-text hidden" dir="rtl"></div>
+            <input type="text" id="keyboardInput" style="position:absolute; left:-9999px; opacity:0; pointer-events:none;" tabindex="-1" readonly inputmode="none" aria-hidden="true" autocomplete="off" autocorrect="off" spellcheck="false">
             <div id="hintBox" class="hidden"></div>
         </div>
 
-        <!-- [תיקון 12] מקלדת עברית קבועה בתוך הדף (בתרגיל הקלדה), במקום מקלדת האייפד -->
-        <div id="onScreenKeyboard" class="hidden">
-            <div id="kbLetters"></div>
-            <div id="kbBottomRow">
-                <button type="button" class="kb-key" id="kbSpace">רווח</button>
-                <button type="button" class="kb-key" id="kbBackspace">⌫ מחק</button>
-            </div>
-        </div>
+        <!-- [תיקון 12] מקלדת עברית קבועה בתוך הדף (בתרגיל הקלדה), במקום מקלדת האייפד. נבנית בסקריפט -->
+        <div id="onScreenKeyboard" class="hidden"></div>
         
         <button class="btn-action btn-large hidden" id="btnNextScene" onclick="nextScene()">המשך לסצנה הבאה ➡️</button>
     </div>
@@ -496,7 +573,8 @@
 
     // [תיקון 7] הגדרות בדיקת הטרייסינג. אפשר לשנות כדי להקל או להחמיר:
     const TRACING_TOLERANCE = 8;     // כמה פיקסלים סטייה מותרים סביב האות (גדול יותר = סלחני יותר)
-    const TRACING_STRIPS_RATIO = 0.8;     // איזה חלק מהאותיות (חתכים לרוחב המשפט) חייב להיות מכוסה
+    const TRACING_MISS_ALLOWANCE = 0.06;  // כמה מהחתכים (0.06 = 6%) מותר לפספס באמצע המשפט. בשורה קצרה זה אומר שאסור לפספס כלום
+    const TRACING_END_STRIPS = 2;         // כמה חתכים בסוף כל שורה (האותיות האחרונות) חייבים להיות מכוסים תמיד
     const TRACING_STRIP_COVER = 0.5;      // כמה מכל חתך צריך להיות מכוסה כדי שייחשב מכוסה
     const TRACING_PRECISION_BAND = 12;    // כמה פיקסלים מחוץ לאות עדיין נחשבים "ליד האות"
     const TRACING_PRECISION = 0.6;        // איזה חלק מהציור חייב להיות ליד האותיות (נגד קישקוש)
@@ -504,6 +582,14 @@
     const MIN_ONE_LINE_FONT = 100;        // אם משפט בשורה אחת היה יוצא קטן מזה, שוברים אותו לשתי שורות
     const HINT_SECONDS = 3;               // כמה שניות הרמז מוצג בתרגיל הקלדה
     const DEBUG = /[?&]debug/.test(location.search); // פתיחה עם ?debug בסוף הכתובת מציגה את מספרי בדיקת הטרייסינג
+    const CORRECTIONS_KEY = 'ninjagoCorrections';    // [תיקון 20] מילון התיקונים נשמר בנפרד מהפרויקטים (חל על כולם)
+    let fullPlayMode = false;     // [תיקון 19] האם המשחק הנוכחי במצב ניגון מלא
+    let fullPlayTarget = null;    // [תיקון 19] הזמן שבו הסרטון ייעצר
+    let fullPlayAfter = null;     // [תיקון 19] מה לעשות כשהסרטון נעצר
+    let typedText = '';           // [תיקון 17] הטקסט שהילד כתב
+    let caretPos = 0;             // [תיקון 17] מיקום הסמן בטקסט
+    let previewTimer = null;      // [תיקון 21] ניגון תצוגה מקדימה של סצנה
+    let reviewIndex = 0;          // [תיקון 18] הסצנה הנוכחית במצב סקירה
 
     const ytElement = document.getElementById('youtubePlayer');
     const localElement = document.getElementById('localPlayer');
@@ -562,6 +648,9 @@
         reader.onload = function(e) {
             const srtText = e.target.result.trim();
             globalRawSrtClips = extractRawClips(srtText);
+            // [תיקון 20] מחילים את מילון התיקונים על הכתוביות החדשות
+            const corrPairs = parseCorrections(loadCorrectionsText());
+            globalRawSrtClips.forEach(c => { c.text = applyCorrectionsToText(c.text, corrPairs).text; });
             
             if (globalRawSrtClips.length > 0) {
                 dropZoneText.innerText = "קובץ התרגום נטען בהצלחה ✔️ (" + globalRawSrtClips.length + " שורות)";
@@ -619,6 +708,14 @@
         return m + ":" + s;
     }
 
+    // [תיקון 21] זמן עם עשירית שנייה (לכיוונון עדין של סצנות)
+    function formatTimePrecise(seconds) {
+        if (isNaN(seconds) || seconds < 0) return "0:00.0";
+        const m = Math.floor(seconds / 60);
+        const s = (seconds % 60).toFixed(1).padStart(4, '0');
+        return m + ":" + s;
+    }
+
     function updateTimeDisplay() {
         document.getElementById('lblStart').innerText = formatTime(tempStart);
         document.getElementById('lblEnd').innerText = formatTime(tempEnd);
@@ -669,6 +766,7 @@
         document.getElementById('typeTracing').checked = true; // [תיקון 5] ברירת המחדל לסצנות חדשות היא טרייסינג
         document.getElementById('chkShowInGame').checked = false;
         document.getElementById('chkBlockSubtitles').checked = true;
+        document.getElementById('chkFullPlay').checked = false;
         
         srtFileInput.value = '';
         dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
@@ -713,12 +811,14 @@
             currentProjectName = selected;
             globalRawSrtClips = [];
             document.getElementById('chkBlockSubtitles').checked = true;
+            document.getElementById('chkFullPlay').checked = false;
         } else {
             scenes = projData.scenes || [];
             currentVideoId = projData.videoId;
             currentProjectName = selected;
             globalRawSrtClips = projData.srtClips || []; 
             document.getElementById('chkBlockSubtitles').checked = projData.blockSubtitles !== false;
+            document.getElementById('chkFullPlay').checked = projData.fullPlay === true;
         }
 
         // [תיקון 2] זוכרים שזה הפרויקט האחרון שנפתח, כדי לטעון אותו אוטומטית בפעם הבאה.
@@ -783,7 +883,8 @@
              scenes = allData[currentProjectName].scenes || [];
              globalRawSrtClips = allData[currentProjectName].srtClips || [];
              document.getElementById('chkBlockSubtitles').checked = allData[currentProjectName].blockSubtitles !== false;
-        } else { scenes = []; globalRawSrtClips = []; document.getElementById('chkBlockSubtitles').checked = true; }
+             document.getElementById('chkFullPlay').checked = allData[currentProjectName].fullPlay === true;
+        } else { scenes = []; globalRawSrtClips = []; document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; }
         
         saveData();
     }
@@ -864,6 +965,8 @@
         const MAX_WORDS = 8;    // מקסימום מילים במשפט
         const MAX_SECONDS = 6;  // מקסימום אורך קטע בשניות (לפני הריווח)
         const MAX_GAP = 1.5;    // שקט ארוך מזה (בשניות) נחשב סוף דיבור, ולא מחברים שורות מעבר אליו
+        const PAD_START = 0.3;  // [תיקון 17] כמה שניות להוסיף לפני המשפט (לכל היותר)
+        const PAD_END = 0.12;   // [תיקון 17] כמה שניות להוסיף אחרי המשפט (לכל היותר). קטן, כדי שהקטע לא יגלוש למילים הבאות
 
         const taskType = document.querySelector('input[name="taskType"]:checked').value;
         const tracing = (taskType === 'tracing');
@@ -906,7 +1009,7 @@
             return true;
         };
 
-        // שלב 3: יוצרים סצנות רק מהיחידות המתאימות. הריווח (עד 0.4 ש') מחושב מול כל היחידות השכנות,
+        // שלב 3: יוצרים סצנות רק מהיחידות המתאימות. הריווח מחושב מול כל היחידות השכנות,
         // גם אלה שלא נבחרו, כדי שהקטע לא יכלול חלק מדיבור אחר.
         let created = 0;
         units.forEach((u, i) => {
@@ -917,11 +1020,9 @@
             let prevEnd = (i > 0) ? units[i-1].end : 0;
             let nextStart = (i < units.length - 1) ? units[i+1].start : e + 5;
 
-            if (s - prevEnd > 0.8) s -= 0.4;
-            else s = s - (s - prevEnd)/2;
-
-            if (nextStart - e > 0.8) e += 0.4;
-            else e = e + (nextStart - e)/2;
+            // [תיקון 17] הריווח לעולם לא עולה על חצי מהשקט שבין המשפטים, ובסוף הוא קצר במיוחד
+            s -= Math.max(0, Math.min(PAD_START, (s - prevEnd) / 2));
+            e += Math.max(0, Math.min(PAD_END, (nextStart - e) / 2));
 
             scenes.push({
                 id: Date.now() + Math.random() + i,
@@ -977,7 +1078,8 @@
             videoId: currentVideoId, 
             scenes: scenes,
             srtClips: globalRawSrtClips,
-            blockSubtitles: document.getElementById('chkBlockSubtitles').checked
+            blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
+            fullPlay: document.getElementById('chkFullPlay').checked
         };
 
         if (currentProjectName && currentProjectName !== projName) { delete allData[currentProjectName]; }
@@ -997,7 +1099,8 @@
             videoId: currentVideoId, 
             scenes: scenes, 
             srtClips: globalRawSrtClips,
-            blockSubtitles: document.getElementById('chkBlockSubtitles').checked
+            blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
+            fullPlay: document.getElementById('chkFullPlay').checked
         };
         localStorage.setItem('ninjagoData', JSON.stringify(allData));
     }
@@ -1050,16 +1153,41 @@
         });
     }
 
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+    }
+
     function renderScenes() {
         const ul = document.getElementById('scenesList');
+        const onlyReportedBox = document.getElementById('chkOnlyReported');
+        const onlyReported = !!(onlyReportedBox && onlyReportedBox.checked);
+        const reportedTotal = scenes.filter(s => s.reportCount > 0).length;
+        const countEl = document.getElementById('reportedCount');
+        if (countEl) countEl.innerText = reportedTotal ? '(' + reportedTotal + ')' : '';
+
         ul.innerHTML = '';
         scenes.forEach((s, i) => {
+            if (onlyReported && !(s.reportCount > 0)) return;
             const li = document.createElement('li');
+            const reported = s.reportCount > 0;
+            if (reported) li.style.background = '#fff3e0';
+
+            // [תיקון 18] מה שהילד דיווח: אפשר לאמץ את מה שכתב או להשאיר את המשפט כמו שהוא
+            let reportHtml = '';
+            if (reported) {
+                reportHtml += `<div style="margin-top:6px; color:#e65100; font-weight:bold;">🚩 דווחה ${s.reportCount} ${s.reportCount === 1 ? 'פעם' : 'פעמים'}</div>`;
+                (s.suggestions || []).forEach((txt, k) => {
+                    reportHtml += `<div style="margin-top:4px;">הילד כתב: "${escapeHtml(txt)}" <button class="btn-success btn-small" onclick="adoptSuggestion(${s.id}, ${k})">אמץ</button></div>`;
+                });
+                reportHtml += `<button class="btn-nav btn-small" style="margin-top:4px;" onclick="dismissReport(${s.id})">השאר כמו שהוא</button>`;
+            }
+
             li.innerHTML = `<div style="display: flex; justify-content: space-between; align-items: start;">
                                 <div>
-                                    <strong>סצנה ${i+1}:</strong> ${formatTime(s.start)} - ${formatTime(s.end)}<br> 
-                                    "${s.text}" <br> 
+                                    <strong>סצנה ${i+1}:</strong> ${formatTimePrecise(s.start)} - ${formatTimePrecise(s.end)}<br> 
+                                    "${escapeHtml(s.text)}" <br> 
                                     <span style="font-size: 14px; color: #666;">${s.tracing ? '✏️ טרייסינג' : '⌨️ הקלדה'}</span>
+                                    ${reportHtml}
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
                                     <label style="cursor: pointer; font-weight: bold; color: #4CAF50; display: flex; align-items: center; gap: 8px;">
@@ -1071,6 +1199,15 @@
                                         <button class="btn-danger btn-small" onclick="deleteScene(${s.id})">מחק</button>
                                     </div>
                                 </div>
+                            </div>
+                            <div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap; align-items:center; font-size:14px;">
+                                <span>התחלה:</span>
+                                <button class="btn-nav btn-small" onclick="nudgeScene(${s.id}, 'start', -0.1)">−0.1</button>
+                                <button class="btn-nav btn-small" onclick="nudgeScene(${s.id}, 'start', 0.1)">+0.1</button>
+                                <span style="margin-right:8px;">סיום:</span>
+                                <button class="btn-nav btn-small" onclick="nudgeScene(${s.id}, 'end', -0.1)">−0.1</button>
+                                <button class="btn-nav btn-small" onclick="nudgeScene(${s.id}, 'end', 0.1)">+0.1</button>
+                                <button class="btn-action btn-small" style="margin-right:8px;" onclick="previewScene(${s.id})">▶ נגן</button>
                             </div>`;
             ul.appendChild(li);
         });
@@ -1096,6 +1233,7 @@
         if (currentMode === 'edit') {
             if (scenes.filter(s => s.show).length === 0) { alert("אין סצנות פעילות למשחק פרויקט זה."); return; }
             currentMode = 'game';
+            fullPlayMode = document.getElementById('chkFullPlay').checked; // [תיקון 19]
             
             // שליטה בפס השחור לפי ההגדרה מהעריכה
             const blocker = document.getElementById('subtitleBlocker');
@@ -1104,6 +1242,7 @@
             document.getElementById('editPanel').classList.remove('active-panel');
             document.getElementById('gamePanel').classList.add('active-panel');
             appContainer.classList.add('game-mode');
+            document.body.classList.add('game-active'); // [תיקון 16] שוליים קטנים יותר במשחק
             document.getElementById('mainTitle').innerText = "משחק קריאה";
             document.getElementById('modeToggleBtn').innerText = "חזור לעריכה ⚙️";
             gamePlaceholder.appendChild(editVideoWrapper);
@@ -1111,10 +1250,19 @@
             setTimeout(() => { startGame(); }, 150);
         } else {
             currentMode = 'edit';
+            // [תיקון 19] עוצרים כל ניגון או המתנה שנשארו מהמשחק
+            if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
+            fullPlayAfter = null;
+            fullPlayTarget = null;
+            setPlayingVideoUI(false);
+            document.getElementById('reportModal').style.display = 'none';
             document.getElementById('gamePanel').classList.remove('active-panel');
             document.getElementById('editPanel').classList.add('active-panel');
             appContainer.classList.remove('game-mode');
             appContainer.classList.remove('typing-task');
+            document.body.classList.remove('game-active');
+            editVideoWrapper.style.width = '';   // [תיקון 16] חוזרים לגודל הרגיל של מצב עריכה
+            editVideoWrapper.style.height = '';
             hideHint();
             document.getElementById('mainTitle').innerText = "מצב עריכה";
             document.getElementById('modeToggleBtn').innerText = "מעבר למשחק 🎮";
@@ -1126,11 +1274,87 @@
 
     function getActiveScenes() { return scenes.filter(s => s.show).sort((a,b) => a.start - b.start); }
 
-    function startGame() { currentGameIndex = 0; loadGameScene(); }
+    function startGame() {
+        currentGameIndex = 0;
+        if (fullPlayMode) startFullPlayIntro();
+        else loadGameScene();
+    }
+
+    // [תיקון 19] מצב ניגון מלא: מתחילים בניגון הסרטון עד תחילת התרגיל הראשון
+    function startFullPlayIntro() {
+        const first = getActiveScenes()[0];
+        document.getElementById('gameProgress').innerText = 'הסרטון מתנגן...';
+        setPlayingVideoUI(true);
+        layoutGame();
+        // הפעלה ראשונה דורשת נגיעה של המשתמש (חוק של iOS), לכן מתחילים אחרי לחיצה על "אישור"
+        showGameMessage("מוכן? 🎬", "הסרטון מתחיל לנגן, והוא ייעצר כשיגיע התרגיל הראשון.", () => {
+            playUntil(0, first.start, () => loadGameScene());
+        });
+    }
+
+    // [תיקון 19] מסך "הסרטון מתנגן": מסתירים את כפתורי התרגיל, האזור והמקלדת, ומציגים כפתור "דלג"
+    function setPlayingVideoUI(on) {
+        document.getElementById('gamePanel').classList.toggle('playing-video', on);
+        document.getElementById('btnSkipPlay').classList.toggle('hidden', !on);
+        if (on) {
+            ['btnPlayAudio', 'btnHint', 'btnReport', 'btnToggleEraser', 'btnClearCanvas', 'btnDoneWriting'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+        }
+    }
+
+    function getVideoDuration() {
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.getDuration === 'function') return ytPlayer.getDuration() || 0;
+        if (videoType === 'local') return localElement.duration || 0;
+        return 0;
+    }
+    function isVideoEnded() {
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.getPlayerState === 'function') return ytPlayer.getPlayerState() === 0;
+        if (videoType === 'local') return localElement.ended;
+        return false;
+    }
+
+    // [תיקון 19] מנגן מהזמן from עד הזמן target ואז עוצר וקורא ל-onDone
+    function playUntil(from, target, onDone) {
+        if (checkInterval) clearInterval(checkInterval);
+        if (from !== null) seekTo(from);
+        playVideo();
+        fullPlayTarget = target;
+        fullPlayAfter = onDone;
+        const startedAt = Date.now();
+        checkInterval = setInterval(() => {
+            const reachedTarget = getCurrentTime() >= target;
+            const ended = (Date.now() - startedAt > 1500) && isVideoEnded(); // מתעלמים ממצב "נגמר" ברגעים הראשונים
+            if (reachedTarget || ended) finishPlayUntil();
+        }, 100);
+    }
+    function finishPlayUntil() {
+        if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
+        pauseVideo();
+        const cb = fullPlayAfter;
+        fullPlayAfter = null;
+        fullPlayTarget = null;
+        if (cb) cb();
+    }
+    // כפתור "דלג": קופצים מיד לנקודה שבה הסרטון אמור להיעצר
+    function skipFullPlay() {
+        if (!fullPlayAfter) return;
+        const target = fullPlayTarget;
+        if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
+        const cb = fullPlayAfter;
+        fullPlayAfter = null;
+        fullPlayTarget = null;
+        if (target !== null && isFinite(target)) seekTo(target);
+        // מרעננים את הפריים בנקודה החדשה (נגינה קצרה ועצירה)
+        playVideo();
+        setTimeout(pauseVideo, 150);
+        cb();
+    }
 
     function loadGameScene() {
         const activeScenes = getActiveScenes();
         if (currentGameIndex >= activeScenes.length) {
+            setPlayingVideoUI(false);
             showGameMessage("כל הכבוד נועם! 🎉", "סיימת את כל הסצנות!", () => toggleMode());
             return;
         }
@@ -1138,19 +1362,24 @@
         const scene = activeScenes[currentGameIndex];
         document.getElementById('gameProgress').innerText = `סצנה ${currentGameIndex + 1} מתוך ${activeScenes.length}`;
         
+        setPlayingVideoUI(false); // [תיקון 19] חוזרים ממסך "הסרטון מתנגן" למסך התרגיל
         document.getElementById('btnNextScene').classList.add('hidden');
         hideHint();
         document.getElementById('btnPlayAudio').classList.remove('hidden');
         document.getElementById('btnDoneWriting').classList.remove('hidden');
+        document.getElementById('btnReport').classList.remove('hidden');
         
-        // תיקון ניגון סצנה לא נכונה: קופץ, מנגן רגע כדי לטעון פריים, ועוצר
-        seekTo(scene.start);
-        playVideo();
-        setTimeout(pauseVideo, 400); 
+        if (!fullPlayMode) {
+            // תיקון ניגון סצנה לא נכונה: קופץ, מנגן רגע כדי לטעון פריים, ועוצר
+            // (במצב ניגון מלא הסרטון כבר נעצר בדיוק בנקודת התרגיל, ולכן לא צריך)
+            seekTo(scene.start);
+            playVideo();
+            setTimeout(pauseVideo, 400); 
+        }
         
         const faded = document.getElementById('fadedText');
         const canvasEl = document.getElementById('drawingCanvas');
-        const inputEl = document.getElementById('keyboardInput');
+        const typedEl = document.getElementById('typedDisplay');
         const clearBtn = document.getElementById('btnClearCanvas');
         const eraserBtn = document.getElementById('btnToggleEraser');
         
@@ -1164,31 +1393,33 @@
             faded.dataset.lines = '';
             faded.classList.remove('hidden');
             canvasEl.classList.remove('hidden');
-            inputEl.classList.add('hidden');
+            typedEl.classList.add('hidden');
             clearBtn.classList.remove('hidden');
             eraserBtn.classList.remove('hidden');
             hintBtn.classList.add('hidden');
             keyboardEl.classList.add('hidden');
             appContainer.classList.remove('typing-task');
             fitFadedText();
-            setTimeout(resizeCanvas, 50); // השהיה קלה לחישוב מדויק של המסך למניעת תקיעת העט
+            setTimeout(() => { resizeCanvas(); layoutGame(); }, 50); // השהיה קלה לחישוב מדויק של המסך למניעת תקיעת העט
             // [תיקון 7] מחכים לטעינת הפונט ואז מתאימים שוב את גודל הטקסט
-            if (document.fonts && document.fonts.load) { document.fonts.load("40px GveretLevin", scene.text).then(fitFadedText).catch(() => {}); }
+            if (document.fonts && document.fonts.load) { document.fonts.load("40px GveretLevin", scene.text).then(() => { fitFadedText(); layoutGame(); }).catch(() => {}); }
         } else {
             faded.classList.add('hidden');
             canvasEl.classList.add('hidden');
-            inputEl.classList.remove('hidden');
+            typedEl.classList.remove('hidden');
             clearBtn.classList.add('hidden');
             eraserBtn.classList.add('hidden');
             hintBtn.classList.remove('hidden');      // [תיקון 13] כפתור רמז רק בתרגיל הקלדה
             keyboardEl.classList.remove('hidden');   // [תיקון 12] מקלדת קבועה רק בתרגיל הקלדה
             appContainer.classList.add('typing-task');
             areaEl.classList.remove('tracing-mode');
-            areaEl.style.height = '';
-            inputEl.value = "";
+            areaEl.style.height = '140px';           // [תיקון 16] אזור כתיבה נמוך יותר בהקלדה, כדי שהמקלדת תיכנס במסך
+            setTyped('', 0);                          // [תיקון 17] מתחילים עם טקסט ריק וסמן בתחילתו
+            const inputEl = document.getElementById('keyboardInput');
             inputEl.disabled = false;
             unlockTypingInput();
         }
+        layoutGame();
     }
 
     // [תיקון 3] נעילה ושחרור של שדה ההקלדה בזמן השמעת משפט.
@@ -1269,8 +1500,9 @@
     }
 
     // [תיקון 15] בדיקת טרייסינג מחמירה יותר. עוברים רק אם כל שלושת התנאים מתקיימים:
-    // 1) כיסוי: המשפט מחולק לחתכים לרוחב (בערך אות בכל חתך), ולפחות TRACING_STRIPS_RATIO מהם חייבים להיות מכוסים.
-    //    כך דילוג על חלק גדול מהמשפט נכשל.
+    // 1) כיסוי: המשפט מחולק לחתכים לרוחב (בערך אות בכל חתך). מותר לפספס רק TRACING_MISS_ALLOWANCE מהחתכים,
+    //    ובנוסף האותיות האחרונות בכל שורה (TRACING_END_STRIPS חתכים) והאות הראשונה חייבות להיות מכוסות תמיד.
+    //    כך דילוג על אות או שתיים בסוף המשפט נכשל.
     // 2) דיוק: לפחות TRACING_PRECISION מהציור חייב להיות ליד האותיות. כך קישקוש רחב נכשל.
     // 3) כמות ציור: לא יותר מ-TRACING_MAX_INK_RATIO כפול שטח האותיות.
     // הטקסט הנסתר מצויר בדיוק איפה שהטקסט הבהיר מופיע (נמדד מהמסך), לכל שורה בנפרד.
@@ -1302,7 +1534,7 @@
         aCtx.fillStyle = '#000';
         aCtx.strokeStyle = '#000';
 
-        let glyphTotal = 0, stripsTotal = 0, stripsCovered = 0;
+        let glyphTotal = 0, stripsTotal = 0, stripsCovered = 0, endsMissed = 0;
 
         lineEls.forEach(lineEl => {
             // קו הכתיבה האמיתי של השורה
@@ -1357,12 +1589,21 @@
                 }
             }
             const minPx = Math.max(20, fontPx * 0.3); // חתך כמעט ריק (רווח בין מילים) לא נספר
+            const counted = []; // החתכים שנספרים, משמאל לימין על המסך
             for (let s = 0; s < n; s++) {
                 if (glyphPx[s] >= minPx) {
+                    const ok = hitPx[s] / glyphPx[s] >= TRACING_STRIP_COVER;
+                    counted.push(ok);
                     stripsTotal++;
-                    if (hitPx[s] / glyphPx[s] >= TRACING_STRIP_COVER) stripsCovered++;
+                    if (ok) stripsCovered++;
                 }
             }
+            // בעברית קוראים מימין לשמאל: האותיות האחרונות בשורה נמצאות בקצה השמאלי, והראשונה בקצה הימני.
+            // חתכי הקצה האלה חייבים להיות מכוסים תמיד.
+            for (let i = 0; i < Math.min(TRACING_END_STRIPS, counted.length); i++) {
+                if (!counted[i]) endsMissed++;
+            }
+            if (counted.length > TRACING_END_STRIPS && !counted[counted.length - 1]) endsMissed++;
         });
 
         if (glyphTotal === 0) return true; // לא הצלחנו למדוד: לא חוסמים את הילד
@@ -1377,10 +1618,12 @@
         }
 
         const coverage = stripsTotal ? stripsCovered / stripsTotal : 1;
+        const missed = stripsTotal - stripsCovered;
+        const allowedMiss = Math.floor(stripsTotal * TRACING_MISS_ALLOWANCE);
         const precision = inkTotal ? inkInside / inkTotal : 0;
         const inkRatio = inkTotal / glyphTotal;
-        const pass = coverage >= TRACING_STRIPS_RATIO && precision >= TRACING_PRECISION && inkRatio <= TRACING_MAX_INK_RATIO;
-        showTracingDebug({ coverage, precision, inkRatio, pass });
+        const pass = endsMissed === 0 && missed <= allowedMiss && precision >= TRACING_PRECISION && inkRatio <= TRACING_MAX_INK_RATIO;
+        showTracingDebug({ coverage, precision, inkRatio, missed, allowedMiss, endsMissed, pass });
         return pass;
     }
 
@@ -1393,7 +1636,7 @@
             debugBox.style.cssText = 'position:fixed;left:10px;bottom:10px;background:rgba(0,0,0,0.85);color:#fff;padding:8px 12px;border-radius:8px;font:14px monospace;z-index:20000;direction:ltr;';
             document.body.appendChild(debugBox);
         }
-        debugBox.textContent = 'coverage ' + Math.round(s.coverage * 100) + '% | precision ' + Math.round(s.precision * 100) + '% | ink ' + s.inkRatio.toFixed(2) + ' | ' + (s.pass ? 'PASS' : 'FAIL');
+        debugBox.textContent = 'coverage ' + Math.round(s.coverage * 100) + '% | missed ' + s.missed + '/' + s.allowedMiss + ' | ends missed ' + s.endsMissed + ' | precision ' + Math.round(s.precision * 100) + '% | ink ' + s.inkRatio.toFixed(2) + ' | ' + (s.pass ? 'PASS' : 'FAIL');
     }
 
     function checkTask() {
@@ -1422,13 +1665,32 @@
         document.getElementById('btnToggleEraser').classList.add('hidden');
         document.getElementById('btnPlayAudio').classList.add('hidden');
         document.getElementById('btnHint').classList.add('hidden');
+        document.getElementById('btnReport').classList.add('hidden');
         document.getElementById('onScreenKeyboard').classList.add('hidden');
         hideHint();
+        overlay.style.display = 'none';  // אם נלחץ "סיימתי" באמצע "השמע משפט": מסירים את המסך השחור
+        playingAudioOnly = false;
         
         const inputEl = document.getElementById('keyboardInput');
         inputEl.blur();
         inputEl.disabled = true; // נמנע מהמקלדת לקפוץ כשהסרטון מתנגן
         if(audioSafetyTimer) clearTimeout(audioSafetyTimer); // [תיקון 3] שלא יפריע לסרטון הפרס
+
+        if (fullPlayMode) {
+            // [תיקון 19] ניגון מלא: ממשיכים לנגן עד תחילת התרגיל הבא, ואחרי התרגיל האחרון עד סוף הסרטון
+            const next = getActiveScenes()[currentGameIndex + 1];
+            let target;
+            if (next) {
+                target = next.start;
+            } else {
+                const dur = getVideoDuration();
+                target = dur > 0 ? Math.max(scene.end, dur - 0.4) : scene.end + 3;
+            }
+            setPlayingVideoUI(true);
+            layoutGame();
+            playUntil(scene.start, target, () => { currentGameIndex++; loadGameScene(); });
+            return;
+        }
         
         seekTo(scene.start);
         playVideo();
@@ -1502,6 +1764,9 @@
             if (twoLineFont > fontPx) { lines = [best.a, best.b]; fontPx = twoLineFont; }
         }
 
+        // [תיקון 16] אזור הכתיבה לא יתפוס יותר מחצי מגובה המסך (נשאר מקום לסרטון)
+        const maxAreaH = Math.max(200, Math.floor(window.innerHeight * 0.5));
+        if (lines.length * fontPx + 90 > maxAreaH) fontPx = Math.floor((maxAreaH - 90) / lines.length);
         fontPx = Math.max(40, Math.floor(fontPx));
         faded.style.fontSize = fontPx + 'px';
 
@@ -1525,10 +1790,13 @@
     // [תיקון 7] מסנכרן את גודל הקנבס לגודל המוצג. מנקה את הציור רק אם הגודל באמת השתנה
     // (בעבר כל אירוע resize, למשל הופעת סרגל הכתובות באייפד, מחק את הציור של הילד).
     function syncCanvasSize() {
-        if (currentMode !== 'game' || canvas.classList.contains('hidden')) return;
-        fitFadedText(); // גם מתאים את גובה האזור למספר השורות
-        const area = document.getElementById('notebookArea');
-        if (area.offsetWidth !== canvas.width || area.offsetHeight !== canvas.height) resizeCanvas();
+        if (currentMode !== 'game') return;
+        if (!canvas.classList.contains('hidden')) {
+            fitFadedText(); // גם מתאים את גובה האזור למספר השורות
+            const area = document.getElementById('notebookArea');
+            if (area.offsetWidth !== canvas.width || area.offsetHeight !== canvas.height) resizeCanvas();
+        }
+        layoutGame(); // [תיקון 16] גודל הסרטון מתעדכן לפי המסך
     }
     window.addEventListener('resize', syncCanvasSize);
     // כשהאנימציה של המעבר למצב משחק מסתיימת, הרוחב משתנה: מסנכרנים שוב
@@ -1599,27 +1867,77 @@
     }, {passive: false});
     btnPlayAudio.addEventListener('click', triggerPlayAudio); // עכבר ומקלדת
 
-    // [תיקון 12] מקלדת עברית קבועה בתוך הדף. סדר האותיות הוא א-ב (קל יותר לילד), כולל אותיות סופיות.
+    // ================= [תיקון 12] מקלדת עברית קבועה בתוך הדף (סידור מקלדת רגילה) =================
+    // השורות לפי המקלדת הפיזית: עליונה ק ר א ט ו ן ם פ, אמצעית ש ד ג כ ע י ח ל ך ף, תחתונה ז ס ב ה נ מ צ ת ץ.
     // בדיקת התשובה ממילא מתייחסת לאות סופית כמו לרגילה.
+    const KB_ROWS = ['קראטוןםפ', 'שדגכעיחלךף', 'זסבהנמצתץ'];
+    function makeKey(label, key, action, extraClass) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'kb-key' + (extraClass ? ' ' + extraClass : '');
+        b.textContent = label;
+        if (key) b.dataset.key = key;
+        if (action) b.dataset.action = action;
+        return b;
+    }
     (function buildOnScreenKeyboard() {
-        const letters = 'אבגדהוזחטיכךלמםנןסעפףצץקרשת';
-        const box = document.getElementById('kbLetters');
-        for (const ch of letters) {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'kb-key';
-            b.dataset.key = ch;
-            b.textContent = ch;
-            box.appendChild(b);
-        }
+        const kb = document.getElementById('onScreenKeyboard');
+        KB_ROWS.forEach((letters, idx) => {
+            const row = document.createElement('div');
+            row.className = 'kb-row';
+            for (const ch of letters) row.appendChild(makeKey(ch, ch));
+            if (idx === 0) row.appendChild(makeKey('⌫ מחק', '', 'back', 'kb-wide kb-back')); // המחיקה בשורה העליונה, כמו במקלדת רגילה
+            kb.appendChild(row);
+        });
+        const last = document.createElement('div');
+        last.className = 'kb-row';
+        last.appendChild(makeKey('◀', '', 'left', 'kb-wide'));
+        last.appendChild(makeKey('רווח', '', 'space', 'kb-space'));
+        last.appendChild(makeKey('▶', '', 'right', 'kb-wide'));
+        kb.appendChild(last);
     })();
     document.getElementById('onScreenKeyboard').addEventListener('click', (e) => {
         const b = e.target.closest('button');
         if (!b) return;
-        const el = document.getElementById('keyboardInput');
-        if (b.id === 'kbBackspace') el.value = el.value.slice(0, -1);
-        else if (b.id === 'kbSpace') el.value += ' ';
-        else if (b.dataset.key) el.value += b.dataset.key;
+        const act = b.dataset.action;
+        if (act === 'back') typedBackspace();
+        else if (act === 'left') moveCaret(+1);   // בעברית קוראים מימין לשמאל: חץ שמאלה מקדם את הסמן בטקסט
+        else if (act === 'right') moveCaret(-1);
+        else if (act === 'space') typedInsert(' ');
+        else if (b.dataset.key) typedInsert(b.dataset.key);
+    });
+
+    // ================= [תיקון 17] טקסט שהילד כותב, עם סמן שאפשר להזיז =================
+    function renderTyped() {
+        const disp = document.getElementById('typedDisplay');
+        disp.innerHTML = '';
+        const caretEl = () => { const c = document.createElement('span'); c.className = 'caret'; return c; };
+        for (let i = 0; i < typedText.length; i++) {
+            if (i === caretPos) disp.appendChild(caretEl());
+            const s = document.createElement('span');
+            s.className = 'ch';
+            s.textContent = typedText[i];
+            disp.appendChild(s);
+        }
+        if (caretPos >= typedText.length) disp.appendChild(caretEl());
+        document.getElementById('keyboardInput').value = typedText; // הערך לבדיקת התשובה
+    }
+    function setTyped(text, pos) {
+        typedText = text;
+        caretPos = Math.max(0, Math.min(text.length, pos));
+        renderTyped();
+    }
+    function typedInsert(s) { setTyped(typedText.slice(0, caretPos) + s + typedText.slice(caretPos), caretPos + s.length); }
+    function typedBackspace() { if (caretPos > 0) setTyped(typedText.slice(0, caretPos - 1) + typedText.slice(caretPos), caretPos - 1); }
+    function moveCaret(d) { setTyped(typedText, caretPos + d); }
+    // נגיעה בטקסט מעבירה את הסמן למקום הנגיעה. בעברית האות הראשונה בימין, לכן הסמן נמצא אחרי כל האותיות שמימין לנגיעה.
+    document.getElementById('typedDisplay').addEventListener('pointerdown', (e) => {
+        let pos = 0;
+        document.getElementById('typedDisplay').querySelectorAll('.ch').forEach(c => {
+            const r = c.getBoundingClientRect();
+            if ((r.left + r.right) / 2 > e.clientX) pos++;
+        });
+        setTyped(typedText, pos);
     });
 
     // [תיקון 13] כפתור רמז: מציג את המשפט HINT_SECONDS שניות מעל אזור הכתיבה
@@ -1639,10 +1957,232 @@
     }
     document.getElementById('btnHint').addEventListener('click', showHint);
 
+    // ================= [תיקון 16] פריסת המשחק לפי גודל המסך =================
+    // הגובה שנשאר לסרטון = גובה המסך פחות אזור הכתיבה, המקלדת והשוליים. הרוחב נגזר מיחס 16:9.
+    function layoutGame() {
+        if (currentMode !== 'game') return;
+        const vh = window.innerHeight;
+        const kbH = Math.max(40, Math.min(58, Math.round(vh * 0.066)));
+        document.documentElement.style.setProperty('--kb-h', kbH + 'px');
+        const kbHidden = document.getElementById('onScreenKeyboard').classList.contains('hidden');
+        const kbTotal = kbHidden ? 0 : (kbH * 4 + 6 * 4 + 8);
+        const typing = appContainer.classList.contains('typing-task');
+        const areaH = document.getElementById('notebookArea').offsetHeight || (typing ? 140 : 233);
+        const side = document.getElementById('gameSide');
+        const kids = Array.from(side.children).filter(c => !c.classList.contains('hidden'));
+        const sideH = kids.reduce((a, c) => a + c.offsetHeight, 0) + 6 * Math.max(0, kids.length - 1);
+        const maxW = Math.max(200, document.getElementById('gameTop').clientWidth - 190 - 12);
+        const avail = vh - 28 - 8 - 6 - 6 - areaH - kbTotal;
+        let videoH = Math.max(150, Math.min(avail, maxW * 9 / 16));
+        videoH = Math.min(Math.max(videoH, sideH), maxW * 9 / 16); // אם עמודת הכפתורים גבוהה יותר, הסרטון מתרחב אליה בחינם
+        videoH = Math.round(videoH);
+        editVideoWrapper.style.height = videoH + 'px';
+        editVideoWrapper.style.width = Math.round(videoH * 16 / 9) + 'px';
+    }
+
+    // ================= [תיקון 18] דיווח על טעות (הילד) וסקירה (ההורה) =================
+    function saveSettingsIfProject() { if (currentProjectName && currentVideoId) saveDataWithoutRender(); }
+
+    function openReport() {
+        const scene = getActiveScenes()[currentGameIndex];
+        if (!scene) return;
+        const typed = (!scene.tracing && typedText.trim()) ? typedText.trim() : '';
+        const withBtn = document.getElementById('btnReportWithText');
+        if (typed) {
+            withBtn.textContent = 'דווח, ושלח גם את מה שכתבתי: ' + typed;
+            withBtn.classList.remove('hidden');
+            document.getElementById('reportText').textContent = 'אם כתבת את המשפט כמו שנשמע לך נכון, אפשר לשלוח אותו להורה.';
+        } else {
+            withBtn.classList.add('hidden');
+            document.getElementById('reportText').textContent = scene.tracing
+                ? 'נשלח להורה שיש טעות במשפט הזה.'
+                : 'נשלח להורה שיש טעות במשפט הזה. אפשר קודם לכתוב את המשפט כמו שנשמע לך נכון, ואז ללחוץ שוב על "יש טעות".';
+        }
+        document.getElementById('reportModal').style.display = 'flex';
+    }
+    function closeReport() { document.getElementById('reportModal').style.display = 'none'; }
+    function submitReport(withText) {
+        const scene = getActiveScenes()[currentGameIndex];
+        closeReport();
+        if (!scene) return;
+        scene.reportCount = (scene.reportCount || 0) + 1;
+        if (withText) {
+            const txt = typedText.trim();
+            scene.suggestions = scene.suggestions || [];
+            if (txt && !scene.suggestions.includes(txt)) scene.suggestions.push(txt);
+        }
+        saveSettingsIfProject();
+        rewardAndPlayFullVideo(); // הילד לא נתקע: ממשיכים לסרטון ולסצנה הבאה
+    }
+    function clearReport(s) { s.reportCount = 0; s.suggestions = []; }
+    function adoptSuggestion(id, idx) {
+        const s = scenes.find(x => x.id === id);
+        if (!s || !s.suggestions || !s.suggestions[idx]) return;
+        s.text = s.suggestions[idx];
+        clearReport(s);
+        saveData();
+    }
+    function dismissReport(id) {
+        const s = scenes.find(x => x.id === id);
+        if (!s) return;
+        clearReport(s);
+        saveData();
+    }
+    document.getElementById('btnReport').addEventListener('click', openReport);
+    document.getElementById('btnReportCancel').addEventListener('click', closeReport);
+    document.getElementById('btnReportPlain').addEventListener('click', () => submitReport(false));
+    document.getElementById('btnReportWithText').addEventListener('click', () => submitReport(true));
+    document.getElementById('btnSkipPlay').addEventListener('click', skipFullPlay);
+
+    // ================= [תיקון 21] כיוונון עדין וניגון תצוגה מקדימה של סצנה =================
+    function applyNudge(s, which, delta) {
+        if (which === 'start') s.start = Math.max(0, Math.min(s.end - 0.3, +(s.start + delta).toFixed(2)));
+        else s.end = Math.max(s.start + 0.3, +(s.end + delta).toFixed(2));
+    }
+    function nudgeScene(id, which, delta) {
+        const s = scenes.find(x => x.id === id);
+        if (!s) return;
+        applyNudge(s, which, delta);
+        const cont = document.getElementById('scenesListContainer');
+        const top = cont.scrollTop;
+        saveData();           // שומר ומרענן את הרשימה
+        cont.scrollTop = top; // נשארים באותו מקום ברשימה
+    }
+    function playRange(start, end) {
+        if (previewTimer) clearInterval(previewTimer);
+        seekTo(start);
+        playVideo();
+        const stopAt = Date.now() + (end - start + 3) * 1000;
+        previewTimer = setInterval(() => {
+            if (getCurrentTime() >= end || Date.now() > stopAt) {
+                pauseVideo();
+                clearInterval(previewTimer);
+                previewTimer = null;
+            }
+        }, 80);
+    }
+    function previewScene(id) {
+        const s = scenes.find(x => x.id === id);
+        if (s) playRange(s.start, s.end);
+    }
+
+    // ================= [תיקון 18] מצב סקירה: עוברים על הסצנות אחת אחת, מקשיבים ומתקנים =================
+    function openReview() {
+        if (scenes.length === 0) { alert("אין סצנות לסקירה."); return; }
+        reviewIndex = 0;
+        showReview();
+        document.getElementById('reviewModal').style.display = 'flex';
+    }
+    function showReview() {
+        const s = scenes[reviewIndex];
+        document.getElementById('reviewTitle').innerText = 'סצנה ' + (reviewIndex + 1) + ' מתוך ' + scenes.length;
+        document.getElementById('reviewTimes').innerText = formatTimePrecise(s.start) + ' - ' + formatTimePrecise(s.end);
+        document.getElementById('reviewText').value = s.text;
+        document.getElementById('reviewActive').checked = !!s.show;
+        const box = document.getElementById('reviewSuggestions');
+        box.innerHTML = '';
+        if (s.reportCount > 0) {
+            const head = document.createElement('div');
+            head.style.cssText = 'color:#e65100; font-weight:bold;';
+            head.textContent = '🚩 הילד דיווח על טעות (' + s.reportCount + ')';
+            box.appendChild(head);
+            (s.suggestions || []).forEach(txt => {
+                const row = document.createElement('div');
+                row.style.marginTop = '4px';
+                row.appendChild(document.createTextNode('הילד כתב: "' + txt + '" '));
+                const btn = document.createElement('button');
+                btn.className = 'btn-success btn-small';
+                btn.textContent = 'השתמש בזה';
+                btn.addEventListener('click', () => { document.getElementById('reviewText').value = txt; });
+                row.appendChild(btn);
+                box.appendChild(row);
+            });
+        }
+    }
+    function reviewCommit() {
+        const s = scenes[reviewIndex];
+        if (!s) return null;
+        const txt = document.getElementById('reviewText').value.trim();
+        if (txt) s.text = txt;
+        s.show = document.getElementById('reviewActive').checked;
+        if (s.reportCount > 0) clearReport(s); // ההורה עבר על הדיווח
+        return s;
+    }
+    function reviewStep(d) {
+        const cur = reviewCommit();
+        saveData();
+        const idx = cur ? scenes.indexOf(cur) : reviewIndex;
+        reviewIndex = Math.max(0, Math.min(scenes.length - 1, idx + d));
+        showReview();
+    }
+    function reviewSaveNext() {
+        const cur = reviewCommit();
+        saveData();
+        const idx = cur ? scenes.indexOf(cur) : reviewIndex;
+        if (idx >= scenes.length - 1) { closeReview(); return; }
+        reviewIndex = idx + 1;
+        showReview();
+    }
+    function reviewPlay() {
+        const s = scenes[reviewIndex];
+        if (s) playRange(s.start, s.end);
+    }
+    function reviewNudge(which, delta) {
+        const s = scenes[reviewIndex];
+        if (!s) return;
+        applyNudge(s, which, delta);
+        document.getElementById('reviewTimes').innerText = formatTimePrecise(s.start) + ' - ' + formatTimePrecise(s.end);
+        saveSettingsIfProject();
+    }
+    function closeReview() {
+        if (previewTimer) { clearInterval(previewTimer); previewTimer = null; }
+        pauseVideo();
+        document.getElementById('reviewModal').style.display = 'none';
+        saveData(); // מרענן את רשימת הסצנות
+    }
+
+    // ================= [תיקון 20] מילון תיקונים לתמלול =================
+    function loadCorrectionsText() { return localStorage.getItem(CORRECTIONS_KEY) || ''; }
+    function parseCorrections(text) {
+        const pairs = [];
+        text.split('\n').forEach(line => {
+            const i = line.indexOf('=');
+            if (i <= 0) return;
+            const wrong = line.slice(0, i).trim();
+            const right = line.slice(i + 1).trim();
+            if (wrong) pairs.push([wrong, right]);
+        });
+        return pairs;
+    }
+    function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    // מחליף רק מילים שלמות (לא חלק ממילה אחרת). כך "אבא" לא יתוקן בתוך "אבאבא".
+    function applyCorrectionsToText(text, pairs) {
+        if (!pairs.length) return { text: text, count: 0 };
+        const map = {};
+        pairs.forEach(pr => { map[pr[0]] = pr[1]; });
+        const keys = Object.keys(map).sort((a, b) => b.length - a.length).map(escapeRegex);
+        const re = new RegExp('(^|[^\\u05D0-\\u05EA])(' + keys.join('|') + ')(?=[^\\u05D0-\\u05EA]|$)', 'g');
+        let count = 0;
+        const out = text.replace(re, (m, pre, word) => { count++; return pre + map[word]; });
+        return { text: out, count: count };
+    }
+    function saveAndApplyCorrections() {
+        const raw = document.getElementById('correctionsInput').value;
+        localStorage.setItem(CORRECTIONS_KEY, raw);
+        const pairs = parseCorrections(raw);
+        let total = 0;
+        globalRawSrtClips.forEach(c => { const r = applyCorrectionsToText(c.text, pairs); c.text = r.text; total += r.count; });
+        scenes.forEach(s => { const r = applyCorrectionsToText(s.text, pairs); s.text = r.text; total += r.count; });
+        saveData();
+        alert(total ? ('בוצעו ' + total + ' החלפות (בכתוביות ובסצנות).') : 'לא נמצאו מילים להחלפה.');
+    }
+
     // [תיקון 2] כשהדף נטען: ממלאים את רשימת הפרויקטים ומנסים לטעון את הפרויקט האחרון.
     // (הטעינה בפועל תתבצע רק כשגם נגן היוטיוב מוכן.)
+    window.addEventListener('orientationchange', () => { setTimeout(syncCanvasSize, 300); });
     window.onload = function() {
         domReady = true;
+        document.getElementById('correctionsInput').value = loadCorrectionsText(); // [תיקון 20]
         populateProjectsList();
         tryRestoreLastProject();
     };
