@@ -236,9 +236,13 @@
             z-index: 6;
         }
 
-        #fadedText { color: rgba(0, 0, 0, 0.15); pointer-events: none; }
+        /* [תיקון 10] טרייסינג: פונט ואזור כתיבה גדולים יותר. משפט ארוך נשבר לשתי שורות (ראה fitFadedText) */
+        #fadedText { color: rgba(0, 0, 0, 0.15); pointer-events: none; font-size: clamp(80px, 14vw, 150px); z-index: 3; }
+        #fadedText .trace-line { position: relative; line-height: 1; white-space: nowrap; text-align: center; width: 100%; }
+        #fadedText .trace-line::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0.2em; border-bottom: 4px solid var(--notebook-bottom); z-index: -1; }
+        .tracing-mode .notebook-line { display: none; }
         /* [תיקון 6] בתרגיל הקלדה השדה כותב בפונט רגיל (לא בכתב היד של הטרייסינג) */
-        #keyboardInput { color: #000; font-family: Arial, sans-serif !important; }
+        #keyboardInput { color: #000; font-family: Arial, sans-serif !important; pointer-events: none; } /* [תיקון 12] השדה לתצוגה בלבד, ההקלדה במקלדת שבדף */
         #drawingCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; cursor: crosshair; }
 
         .progress-bar { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; color: var(--secondary-color); }
@@ -257,6 +261,21 @@
             background: #fff; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px;
             text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
+        /* [תיקון 11] שורת הכפתורים העליונה במשחק */
+        #gameToolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 15px; }
+        .game-btn { font-size: 20px; padding: 12px 22px; min-height: 56px; }
+        /* [תיקון 12] מקלדת עברית קבועה בתוך הדף */
+        #onScreenKeyboard { margin-top: 15px; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+        #kbLetters { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; }
+        .kb-key { padding: 0; height: 64px; font-size: 32px; font-family: Arial, sans-serif; background: #fff; border: 2px solid #90a4ae; border-radius: 10px; color: #263238; }
+        .kb-key:active { background: #bbdefb; }
+        #kbBottomRow { display: flex; gap: 8px; margin-top: 8px; }
+        #kbSpace { flex: 3; }
+        #kbBackspace { flex: 1; background: #ffcdd2; }
+        /* [תיקון 13] תיבת הרמז */
+        #hintBox { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; background: #fffde7; border: 3px solid #ffb300; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10px; font-family: Arial, sans-serif; font-size: clamp(32px, 6vw, 56px); font-weight: bold; color: #1565c0; }
+        /* בתרגיל הקלדה הסרטון קטן יותר, כדי שהמקלדת תיכנס במסך */
+        .game-mode.typing-task .video-wrapper { width: 38%; }
         /* [תיקון 9] חלון הודעות מעוצב בתוך הדף, במקום alert של Safari */
         #customMessageModal {
             display: none;
@@ -402,6 +421,7 @@
             </div>
             
             <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                <button class="btn-action" style="flex: 1;" id="btnToggleAll" onclick="toggleAllScenes()">✅ הפעל את כל הסצנות</button>
                 <button class="btn-danger" style="flex: 1;" onclick="deleteAllScenesInProject()">מחק כל הסצנות 🗑️</button>
                 <button class="btn-danger" style="flex: 1; background-color: #b71c1c;" onclick="resetEntireSystem()">איפוס מערכת ⚠️</button>
             </div>
@@ -416,25 +436,34 @@
 
     <!-- ================= מצב משחק ================= -->
     <div id="gamePanel" class="panel">
-        <!-- [תיקון 8] כפתור "השמע משפט" הועבר לשורה שמעל הסרטון, הרחק משדה ההקלדה. המאזינים שלו מוגדרים בסקריפט -->
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:15px; margin-bottom:15px;">
-            <div class="progress-bar" id="gameProgress" style="margin-bottom:0;">סצנה 1 מתוך 5</div>
-            <button class="btn-action" style="font-size: 20px; padding: 12px 30px;" id="btnPlayAudio">השמע משפט 🔊</button>
+        <div class="progress-bar" id="gameProgress" style="margin-bottom:10px;">סצנה 1 מתוך 5</div>
+
+        <!-- [תיקון 11] כל כפתורי המשחק בשורה אחת למעלה. המאזינים של "השמע משפט" ו"רמז" מוגדרים בסקריפט -->
+        <div id="gameToolbar">
+            <button class="btn-action game-btn" id="btnPlayAudio">השמע משפט 🔊</button>
+            <button class="btn-nav game-btn hidden" id="btnHint">💡 רמז</button>
+            <button class="btn-nav game-btn hidden" id="btnToggleEraser" onclick="toggleEraser()">מחק 🧽</button>
+            <button class="btn-danger game-btn hidden" id="btnClearCanvas" onclick="resizeCanvas()">נקה לוח 🗑️</button>
+            <button class="btn-success game-btn" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
         </div>
-        
+
         <div id="gameVideoPlaceholder"></div>
         
         <div class="notebook-area" id="notebookArea">
             <div class="notebook-line"></div>
             <div id="fadedText" class="notebook-text hidden"></div>
             <canvas id="drawingCanvas" class="hidden"></canvas>
-            <input type="text" id="keyboardInput" class="notebook-text hidden" placeholder="" autocomplete="off" autocorrect="off" spellcheck="false" dir="rtl">
+            <input type="text" id="keyboardInput" class="notebook-text hidden" placeholder="" autocomplete="off" autocorrect="off" spellcheck="false" dir="rtl" readonly inputmode="none">
+            <div id="hintBox" class="hidden"></div>
         </div>
 
-        <div style="display:flex; gap: 10px; margin-top: 25px;">
-            <button class="btn-success btn-large" style="margin-top:0;" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
-            <button class="btn-nav btn-large hidden" style="margin-top:0; flex-basis: 30%;" id="btnToggleEraser" onclick="toggleEraser()">מחק 🧽</button>
-            <button class="btn-danger btn-large hidden" style="margin-top:0; flex-basis: 30%;" id="btnClearCanvas" onclick="resizeCanvas()">נקה לוח 🗑️</button>
+        <!-- [תיקון 12] מקלדת עברית קבועה בתוך הדף (בתרגיל הקלדה), במקום מקלדת האייפד -->
+        <div id="onScreenKeyboard" class="hidden">
+            <div id="kbLetters"></div>
+            <div id="kbBottomRow">
+                <button type="button" class="kb-key" id="kbSpace">רווח</button>
+                <button type="button" class="kb-key" id="kbBackspace">⌫ מחק</button>
+            </div>
         </div>
         
         <button class="btn-action btn-large hidden" id="btnNextScene" onclick="nextScene()">המשך לסצנה הבאה ➡️</button>
@@ -467,7 +496,14 @@
 
     // [תיקון 7] הגדרות בדיקת הטרייסינג. אפשר לשנות כדי להקל או להחמיר:
     const TRACING_TOLERANCE = 8;     // כמה פיקסלים סטייה מותרים סביב האות (גדול יותר = סלחני יותר)
-    const TRACING_PASS_RATIO = 0.4;  // איזה חלק מהאותיות צריך לכסות כדי לעבור (0.4 = 40%)
+    const TRACING_STRIPS_RATIO = 0.8;     // איזה חלק מהאותיות (חתכים לרוחב המשפט) חייב להיות מכוסה
+    const TRACING_STRIP_COVER = 0.5;      // כמה מכל חתך צריך להיות מכוסה כדי שייחשב מכוסה
+    const TRACING_PRECISION_BAND = 12;    // כמה פיקסלים מחוץ לאות עדיין נחשבים "ליד האות"
+    const TRACING_PRECISION = 0.6;        // איזה חלק מהציור חייב להיות ליד האותיות (נגד קישקוש)
+    const TRACING_MAX_INK_RATIO = 2.5;    // כמות ציור מקסימלית ביחס לשטח האותיות (נגד קישקוש)
+    const MIN_ONE_LINE_FONT = 100;        // אם משפט בשורה אחת היה יוצא קטן מזה, שוברים אותו לשתי שורות
+    const HINT_SECONDS = 3;               // כמה שניות הרמז מוצג בתרגיל הקלדה
+    const DEBUG = /[?&]debug/.test(location.search); // פתיחה עם ?debug בסוף הכתובת מציגה את מספרי בדיקת הטרייסינג
 
     const ytElement = document.getElementById('youtubePlayer');
     const localElement = document.getElementById('localPlayer');
@@ -968,7 +1004,7 @@
 
     function toggleSceneVisibility(id, isChecked) {
         const sc = scenes.find(x => x.id === id);
-        if(sc) { sc.show = isChecked; saveDataWithoutRender(); }
+        if(sc) { sc.show = isChecked; saveDataWithoutRender(); updateToggleAllLabel(); }
     }
 
     function editScene(id) {
@@ -1038,6 +1074,22 @@
                             </div>`;
             ul.appendChild(li);
         });
+        updateToggleAllLabel();
+    }
+
+    // [תיקון 14] כיתוב הכפתור "הפעל/כבה הכול" מתעדכן לפי מצב הסצנות
+    function updateToggleAllLabel() {
+        const toggleAllBtn = document.getElementById('btnToggleAll');
+        if (toggleAllBtn) toggleAllBtn.innerText = (scenes.length === 0 || scenes.some(s => !s.show)) ? '✅ הפעל את כל הסצנות' : '⬜ כבה את כל הסצנות';
+    }
+
+    // [תיקון 14] הופך את כל הסצנות לפעילות. אם כולן כבר פעילות, הופך את כולן ללא פעילות.
+    function toggleAllScenes() {
+        if (scenes.length === 0) { alert("אין סצנות בפרויקט."); return; }
+        const turnOn = scenes.some(s => !s.show);
+        scenes.forEach(s => { s.show = turnOn; });
+        saveData();
+        renderScenes(); // מרענן את הרשימה והכיתוב גם אם השמירה לא התבצעה
     }
 
     function toggleMode() {
@@ -1062,6 +1114,8 @@
             document.getElementById('gamePanel').classList.remove('active-panel');
             document.getElementById('editPanel').classList.add('active-panel');
             appContainer.classList.remove('game-mode');
+            appContainer.classList.remove('typing-task');
+            hideHint();
             document.getElementById('mainTitle').innerText = "מצב עריכה";
             document.getElementById('modeToggleBtn').innerText = "מעבר למשחק 🎮";
             document.getElementById('editPanel').insertBefore(editVideoWrapper, document.getElementById('editPanel').children[2]);
@@ -1085,6 +1139,7 @@
         document.getElementById('gameProgress').innerText = `סצנה ${currentGameIndex + 1} מתוך ${activeScenes.length}`;
         
         document.getElementById('btnNextScene').classList.add('hidden');
+        hideHint();
         document.getElementById('btnPlayAudio').classList.remove('hidden');
         document.getElementById('btnDoneWriting').classList.remove('hidden');
         
@@ -1099,15 +1154,25 @@
         const clearBtn = document.getElementById('btnClearCanvas');
         const eraserBtn = document.getElementById('btnToggleEraser');
         
+        const hintBtn = document.getElementById('btnHint');
+        const keyboardEl = document.getElementById('onScreenKeyboard');
+        const areaEl = document.getElementById('notebookArea');
+
         if (scene.tracing) {
-            faded.innerText = scene.text;
+            // [תיקון 10] הטקסט נשמר כאן, ו-fitFadedText בונה ממנו שורה אחת או שתיים בגודל הגדול ביותר שנכנס
+            faded.dataset.text = scene.text;
+            faded.dataset.lines = '';
             faded.classList.remove('hidden');
             canvasEl.classList.remove('hidden');
             inputEl.classList.add('hidden');
             clearBtn.classList.remove('hidden');
             eraserBtn.classList.remove('hidden');
+            hintBtn.classList.add('hidden');
+            keyboardEl.classList.add('hidden');
+            appContainer.classList.remove('typing-task');
+            fitFadedText();
             setTimeout(resizeCanvas, 50); // השהיה קלה לחישוב מדויק של המסך למניעת תקיעת העט
-            // [תיקון 7] מחכים לטעינת הפונט ואז מתאימים את גודל הטקסט לרוחב המסך
+            // [תיקון 7] מחכים לטעינת הפונט ואז מתאימים שוב את גודל הטקסט
             if (document.fonts && document.fonts.load) { document.fonts.load("40px GveretLevin", scene.text).then(fitFadedText).catch(() => {}); }
         } else {
             faded.classList.add('hidden');
@@ -1115,9 +1180,14 @@
             inputEl.classList.remove('hidden');
             clearBtn.classList.add('hidden');
             eraserBtn.classList.add('hidden');
+            hintBtn.classList.remove('hidden');      // [תיקון 13] כפתור רמז רק בתרגיל הקלדה
+            keyboardEl.classList.remove('hidden');   // [תיקון 12] מקלדת קבועה רק בתרגיל הקלדה
+            appContainer.classList.add('typing-task');
+            areaEl.classList.remove('tracing-mode');
+            areaEl.style.height = '';
             inputEl.value = "";
             inputEl.disabled = false;
-            unlockTypingInput(); // [תיקון 3] מחזיר את השדה למצב רגיל בכל סצנה חדשה
+            unlockTypingInput();
         }
     }
 
@@ -1131,9 +1201,10 @@
         el.blur();
     }
     function unlockTypingInput() {
+        // [תיקון 12] כבר לא מחזירים את מקלדת המערכת: השדה נשאר לתצוגה בלבד וההקלדה נעשית במקלדת שבדף
         const el = document.getElementById('keyboardInput');
-        el.readOnly = false;
-        el.setAttribute('inputmode', 'text');
+        el.readOnly = true;
+        el.setAttribute('inputmode', 'none');
     }
 
     function playAudioOnly() {
@@ -1197,70 +1268,132 @@
         }
     }
 
-    // [תיקון 7] בדיקת טרייסינג חדשה.
-    // 1) מודדים איפה הטקסט הבהיר באמת מופיע על המסך (מרכז וקו כתיבה) ומציירים את הטקסט הנסתר בדיוק שם.
-    // 2) הציור של הילד "מעובה" מעט (TRACING_TOLERANCE), כך שסטייה קטנה לא נחשבת טעות.
-    // 3) עוברים אם הציור כיסה לפחות TRACING_PASS_RATIO מהאותיות.
+    // [תיקון 15] בדיקת טרייסינג מחמירה יותר. עוברים רק אם כל שלושת התנאים מתקיימים:
+    // 1) כיסוי: המשפט מחולק לחתכים לרוחב (בערך אות בכל חתך), ולפחות TRACING_STRIPS_RATIO מהם חייבים להיות מכוסים.
+    //    כך דילוג על חלק גדול מהמשפט נכשל.
+    // 2) דיוק: לפחות TRACING_PRECISION מהציור חייב להיות ליד האותיות. כך קישקוש רחב נכשל.
+    // 3) כמות ציור: לא יותר מ-TRACING_MAX_INK_RATIO כפול שטח האותיות.
+    // הטקסט הנסתר מצויר בדיוק איפה שהטקסט הבהיר מופיע (נמדד מהמסך), לכל שורה בנפרד.
     function validateTracing() {
-        const scene = getActiveScenes()[currentGameIndex];
-        const fadedElement = document.getElementById('fadedText');
-
-        // קו הכתיבה: אלמנט זעיר שיושב בדיוק על קו הבסיס של הטקסט
-        const probe = document.createElement('span');
-        probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
-        fadedElement.appendChild(probe);
-        const baselineY = probe.getBoundingClientRect().bottom;
-        fadedElement.removeChild(probe);
-
-        // רוחב ומרכז הטקסט כפי שהם מופיעים בפועל
-        const range = document.createRange();
-        range.selectNodeContents(fadedElement);
-        const textRect = range.getBoundingClientRect();
-
-        // המרה ממיקום במסך למיקום בתוך הקנבס (גם אם גודל הקנבס שונה מהגודל המוצג)
+        const faded = document.getElementById('fadedText');
+        const lineEls = Array.from(faded.querySelectorAll('.trace-line'));
+        const w = canvas.width, h = canvas.height;
         const cr = canvas.getBoundingClientRect();
-        const scale = canvas.width / cr.width;
-        const centerX = ((textRect.left + textRect.right) / 2 - cr.left) * scale;
-        const baseY = (baselineY - cr.top) * scale;
-        const fontPx = parseFloat(window.getComputedStyle(fadedElement).fontSize) * scale;
+        const scale = w / cr.width;
+        const fontPx = parseFloat(window.getComputedStyle(faded).fontSize) * scale;
+        const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 
-        const hiddenCanvas = document.createElement('canvas');
-        hiddenCanvas.width = canvas.width;
-        hiddenCanvas.height = canvas.height;
-        const hCtx = hiddenCanvas.getContext('2d');
-        hCtx.font = fontPx + "px 'GveretLevin', Arial";
-        hCtx.direction = 'rtl';
-        hCtx.textAlign = 'center';
-        hCtx.textBaseline = 'alphabetic';
-        hCtx.fillStyle = '#000';
-        hCtx.fillText(scene.text, centerX, baseY);
-
-        // הציור של הילד, מעובה: מציירים אותו כמה פעמים בהזזות קטנות
-        const dilated = document.createElement('canvas');
-        dilated.width = canvas.width;
-        dilated.height = canvas.height;
+        // הציור של הילד, וגרסה מעובה שלו (לבדיקת כיסוי עם סבלנות לסטייה קטנה)
+        const inkData = ctx.getImageData(0, 0, w, h).data;
+        const dilated = mk();
         const dCtx = dilated.getContext('2d');
         for (let dx = -TRACING_TOLERANCE; dx <= TRACING_TOLERANCE; dx += 4) {
             for (let dy = -TRACING_TOLERANCE; dy <= TRACING_TOLERANCE; dy += 4) {
                 dCtx.drawImage(canvas, dx, dy);
             }
         }
+        const dilData = dCtx.getImageData(0, 0, w, h).data;
 
-        const refData = hCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height).data;
-        const userData = dCtx.getImageData(0, 0, dilated.width, dilated.height).data;
+        // האזור "ליד האותיות" (האותיות עצמן + פס סביבן)
+        const allowed = mk();
+        const aCtx = allowed.getContext('2d');
+        aCtx.lineWidth = TRACING_PRECISION_BAND * 2;
+        aCtx.lineJoin = 'round';
+        aCtx.fillStyle = '#000';
+        aCtx.strokeStyle = '#000';
 
-        let targetPixels = 0;
-        let hitPixels = 0;
+        let glyphTotal = 0, stripsTotal = 0, stripsCovered = 0;
 
-        for (let i = 3; i < refData.length; i += 4) {
-            if (refData[i] > 50) {
-                targetPixels++;
-                if (userData[i] > 50) { hitPixels++; }
+        lineEls.forEach(lineEl => {
+            // קו הכתיבה האמיתי של השורה
+            const probe = document.createElement('span');
+            probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
+            lineEl.appendChild(probe);
+            const baselineY = probe.getBoundingClientRect().bottom;
+            lineEl.removeChild(probe);
+
+            // רוחב ומרכז השורה כפי שהם מופיעים בפועל
+            const range = document.createRange();
+            range.selectNodeContents(lineEl);
+            const rect = range.getBoundingClientRect();
+            const left = (rect.left - cr.left) * scale;
+            const right = (rect.right - cr.left) * scale;
+            const centerX = (left + right) / 2;
+            const baseY = (baselineY - cr.top) * scale;
+            const text = lineEl.textContent;
+
+            const g = mk();
+            const gCtx = g.getContext('2d');
+            [gCtx, aCtx].forEach(c => {
+                c.font = fontPx + "px 'GveretLevin', Arial";
+                c.direction = 'rtl';
+                c.textAlign = 'center';
+                c.textBaseline = 'alphabetic';
+            });
+            gCtx.fillStyle = '#000';
+            gCtx.fillText(text, centerX, baseY);
+            aCtx.strokeText(text, centerX, baseY);
+            aCtx.fillText(text, centerX, baseY);
+
+            const gData = gCtx.getImageData(0, 0, w, h).data;
+
+            // חתכים לרוחב השורה (בערך אות בכל חתך)
+            const stripW = Math.max(20, fontPx * 0.5);
+            const n = Math.max(1, Math.round((right - left) / stripW));
+            const sw = (right - left) / n;
+            const glyphPx = new Array(n).fill(0);
+            const hitPx = new Array(n).fill(0);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const idx = (y * w + x) * 4 + 3;
+                    if (gData[idx] > 50) {
+                        let s = Math.floor((x - left) / sw);
+                        if (s < 0) s = 0;
+                        if (s >= n) s = n - 1;
+                        glyphPx[s]++;
+                        glyphTotal++;
+                        if (dilData[idx] > 50) hitPx[s]++;
+                    }
+                }
+            }
+            const minPx = Math.max(20, fontPx * 0.3); // חתך כמעט ריק (רווח בין מילים) לא נספר
+            for (let s = 0; s < n; s++) {
+                if (glyphPx[s] >= minPx) {
+                    stripsTotal++;
+                    if (hitPx[s] / glyphPx[s] >= TRACING_STRIP_COVER) stripsCovered++;
+                }
+            }
+        });
+
+        if (glyphTotal === 0) return true; // לא הצלחנו למדוד: לא חוסמים את הילד
+
+        const aData = aCtx.getImageData(0, 0, w, h).data;
+        let inkTotal = 0, inkInside = 0;
+        for (let i = 3; i < inkData.length; i += 4) {
+            if (inkData[i] > 50) {
+                inkTotal++;
+                if (aData[i] > 50) inkInside++;
             }
         }
 
-        if (targetPixels === 0) return true;
-        return (hitPixels / targetPixels) >= TRACING_PASS_RATIO;
+        const coverage = stripsTotal ? stripsCovered / stripsTotal : 1;
+        const precision = inkTotal ? inkInside / inkTotal : 0;
+        const inkRatio = inkTotal / glyphTotal;
+        const pass = coverage >= TRACING_STRIPS_RATIO && precision >= TRACING_PRECISION && inkRatio <= TRACING_MAX_INK_RATIO;
+        showTracingDebug({ coverage, precision, inkRatio, pass });
+        return pass;
+    }
+
+    // מציג את מספרי הבדיקה על המסך, רק כשהדף נפתח עם ?debug בסוף הכתובת (לכיוונון)
+    let debugBox = null;
+    function showTracingDebug(s) {
+        if (!DEBUG) return;
+        if (!debugBox) {
+            debugBox = document.createElement('div');
+            debugBox.style.cssText = 'position:fixed;left:10px;bottom:10px;background:rgba(0,0,0,0.85);color:#fff;padding:8px 12px;border-radius:8px;font:14px monospace;z-index:20000;direction:ltr;';
+            document.body.appendChild(debugBox);
+        }
+        debugBox.textContent = 'coverage ' + Math.round(s.coverage * 100) + '% | precision ' + Math.round(s.precision * 100) + '% | ink ' + s.inkRatio.toFixed(2) + ' | ' + (s.pass ? 'PASS' : 'FAIL');
     }
 
     function checkTask() {
@@ -1288,6 +1421,9 @@
         document.getElementById('btnClearCanvas').classList.add('hidden');
         document.getElementById('btnToggleEraser').classList.add('hidden');
         document.getElementById('btnPlayAudio').classList.add('hidden');
+        document.getElementById('btnHint').classList.add('hidden');
+        document.getElementById('onScreenKeyboard').classList.add('hidden');
+        hideHint();
         
         const inputEl = document.getElementById('keyboardInput');
         inputEl.blur();
@@ -1332,30 +1468,67 @@
         }
     }
 
-    // [תיקון 7] מקטינים את הפונט במשפטים ארוכים כדי שייכנסו ברוחב המסך (אחרת הטקסט גולש ואי אפשר לעבור עליו)
+    // [תיקון 10] מתאים את הטקסט של הטרייסינג לרוחב המסך: הפונט הגדול ביותר שנכנס.
+    // אם המשפט בשורה אחת היה יוצא קטן מ-MIN_ONE_LINE_FONT, שוברים אותו לשתי שורות מאוזנות (גדולות יותר).
+    // גם גובה אזור הכתיבה מותאם למספר השורות, וכל שורה מקבלת קו כתיבה משלה.
     function fitFadedText() {
         const faded = document.getElementById('fadedText');
         if (faded.classList.contains('hidden')) return;
+        const text = faded.dataset.text || '';
+        if (!text) return;
         const area = document.getElementById('notebookArea');
-        faded.style.fontSize = '';  // חוזרים לגודל הרגיל מה-CSS
+
+        faded.style.fontSize = '';  // חוזרים לגודל המקסימלי מה-CSS
         const base = parseFloat(window.getComputedStyle(faded).fontSize);
+        const maxWidth = area.clientWidth * 0.94;
         const mctx = document.createElement('canvas').getContext('2d');
         mctx.font = base + "px 'GveretLevin', Arial";
         mctx.direction = 'rtl';
-        const textWidth = mctx.measureText(faded.textContent).width;
-        const maxWidth = area.clientWidth * 0.94;
-        if (textWidth > maxWidth) {
-            faded.style.fontSize = Math.max(32, Math.floor(base * maxWidth / textWidth)) + 'px';
+        const widthOf = (s) => mctx.measureText(s).width;
+
+        let lines = [text];
+        let fontPx = Math.min(base, base * maxWidth / widthOf(text));
+
+        const words = text.split(/\s+/).filter(Boolean);
+        if (fontPx < MIN_ONE_LINE_FONT && words.length >= 2) {
+            let best = null;
+            for (let i = 1; i < words.length; i++) {
+                const a = words.slice(0, i).join(' ');
+                const b = words.slice(i).join(' ');
+                const w = Math.max(widthOf(a), widthOf(b));
+                if (!best || w < best.w) best = { a: a, b: b, w: w };
+            }
+            const twoLineFont = Math.min(base, base * maxWidth / best.w);
+            if (twoLineFont > fontPx) { lines = [best.a, best.b]; fontPx = twoLineFont; }
         }
+
+        fontPx = Math.max(40, Math.floor(fontPx));
+        faded.style.fontSize = fontPx + 'px';
+
+        // בונים מחדש את השורות רק אם הן השתנו
+        const key = lines.join('\n');
+        if (faded.dataset.lines !== key) {
+            faded.innerHTML = '';
+            lines.forEach(l => {
+                const d = document.createElement('div');
+                d.className = 'trace-line';
+                d.textContent = l;
+                faded.appendChild(d);
+            });
+            faded.dataset.lines = key;
+        }
+
+        area.classList.add('tracing-mode');
+        area.style.height = Math.max(220, Math.ceil(lines.length * fontPx + 90)) + 'px';
     }
 
     // [תיקון 7] מסנכרן את גודל הקנבס לגודל המוצג. מנקה את הציור רק אם הגודל באמת השתנה
     // (בעבר כל אירוע resize, למשל הופעת סרגל הכתובות באייפד, מחק את הציור של הילד).
     function syncCanvasSize() {
         if (currentMode !== 'game' || canvas.classList.contains('hidden')) return;
+        fitFadedText(); // גם מתאים את גובה האזור למספר השורות
         const area = document.getElementById('notebookArea');
         if (area.offsetWidth !== canvas.width || area.offsetHeight !== canvas.height) resizeCanvas();
-        else fitFadedText();
     }
     window.addEventListener('resize', syncCanvasSize);
     // כשהאנימציה של המעבר למצב משחק מסתיימת, הרוחב משתנה: מסנכרנים שוב
@@ -1425,6 +1598,46 @@
         triggerPlayAudio();
     }, {passive: false});
     btnPlayAudio.addEventListener('click', triggerPlayAudio); // עכבר ומקלדת
+
+    // [תיקון 12] מקלדת עברית קבועה בתוך הדף. סדר האותיות הוא א-ב (קל יותר לילד), כולל אותיות סופיות.
+    // בדיקת התשובה ממילא מתייחסת לאות סופית כמו לרגילה.
+    (function buildOnScreenKeyboard() {
+        const letters = 'אבגדהוזחטיכךלמםנןסעפףצץקרשת';
+        const box = document.getElementById('kbLetters');
+        for (const ch of letters) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'kb-key';
+            b.dataset.key = ch;
+            b.textContent = ch;
+            box.appendChild(b);
+        }
+    })();
+    document.getElementById('onScreenKeyboard').addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        const el = document.getElementById('keyboardInput');
+        if (b.id === 'kbBackspace') el.value = el.value.slice(0, -1);
+        else if (b.id === 'kbSpace') el.value += ' ';
+        else if (b.dataset.key) el.value += b.dataset.key;
+    });
+
+    // [תיקון 13] כפתור רמז: מציג את המשפט HINT_SECONDS שניות מעל אזור הכתיבה
+    let hintTimer = null;
+    function hideHint() {
+        if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
+        document.getElementById('hintBox').classList.add('hidden');
+    }
+    function showHint() {
+        const scene = getActiveScenes()[currentGameIndex];
+        if (!scene || scene.tracing) return;
+        const box = document.getElementById('hintBox');
+        box.textContent = scene.text;
+        box.classList.remove('hidden');
+        if (hintTimer) clearTimeout(hintTimer);
+        hintTimer = setTimeout(hideHint, HINT_SECONDS * 1000);
+    }
+    document.getElementById('btnHint').addEventListener('click', showHint);
 
     // [תיקון 2] כשהדף נטען: ממלאים את רשימת הפרויקטים ומנסים לטעון את הפרויקט האחרון.
     // (הטעינה בפועל תתבצע רק כשגם נגן היוטיוב מוכן.)
