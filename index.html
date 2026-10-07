@@ -38,7 +38,7 @@
 
         #app-container {
             width: 100%;
-            max-width: 800px;
+            max-width: 1200px;
             background: #fff;
             padding: 20px;
             border-radius: 12px;
@@ -190,7 +190,7 @@
         .drop-zone input[type="file"] { display: none; }
 
         #scenesListContainer {
-            max-height: 350px;
+            max-height: 55vh;
             overflow-y: auto;
             background: #fff;
             border: 1px solid #ddd;
@@ -303,6 +303,49 @@
             background: rgba(0,0,0,0.6); z-index: 9999;
             justify-content: center; align-items: center;
         }
+        /* [תיקון 22] מסך עריכה בשתי עמודות עם לשוניות */
+        #editLayout { display: flex; gap: 16px; align-items: flex-start; }
+        #editLeft { flex: 0 0 44%; position: sticky; top: 84px; }
+        #editRight { flex: 1; min-width: 0; }
+        #editTabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+        .tab-btn { background: #eceff1; color: #37474f; padding: 10px 14px; font-size: 16px; }
+        .tab-btn.active { background: #2196F3; color: #fff; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+        @media (max-width: 900px) {
+            #editLayout { flex-direction: column; }
+            #editLeft { position: static; width: 100%; flex: none; }
+        }
+        /* [תיקון 23] שורת כותרת במשחק: התקדמות מימין, כפתור גרירה לחזרה לעריכה משמאל (רחוק משאר הכפתורים) */
+        #gameHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; min-height: 40px; }
+        #gameHeader .progress-bar { margin: 0; font-size: 18px; }
+        #exitSlider { position: relative; width: 230px; height: 40px; flex: none; background: #eceff1; border-radius: 20px; direction: ltr; overflow: hidden; user-select: none; -webkit-user-select: none; }
+        #exitSlider span { position: absolute; left: 54px; right: 8px; top: 0; line-height: 40px; font-size: 13px; color: #78909c; text-align: center; pointer-events: none; }
+        #exitThumb { position: absolute; top: 3px; left: 3px; width: 48px; height: 34px; border-radius: 17px; background: #ffb300; text-align: center; line-height: 34px; font-size: 18px; touch-action: none; cursor: grab; }
+        /* [תיקון 24] כתיבה חופשית: המשפט הנכון נחשף והילד מאשר בעצמו */
+        #selfCheckPanel { display: flex; align-items: center; gap: 12px; background: #fffde7; border: 3px solid #ffb300; border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; }
+        #selfCheckPanel .sc-text { flex: 1; text-align: center; font-family: Arial, sans-serif; font-size: clamp(24px, 3.6vw, 38px); font-weight: bold; color: #1565c0; }
+        #selfCheckPanel .game-btn { width: auto; min-width: 150px; }
+        /* [תיקון 25] דוח */
+        .rep-session { margin: 14px 0 6px; font-size: 17px; color: #37474f; border-bottom: 2px solid #cfd8dc; padding-bottom: 4px; }
+        .rep-item { border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: #fff; page-break-inside: avoid; }
+        .rep-expected { font-size: 20px; font-weight: bold; }
+        .rep-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 14px; margin-right: 8px; color: #fff; }
+        .rep-good { background: #43a047; } .rep-bad { background: #e53935; } .rep-flag { background: #fb8c00; } .rep-none { background: #90a4ae; }
+        .rep-img { display: block; max-width: 100%; max-height: 110px; margin-top: 6px; border: 1px solid #cfd8dc; background: #fff; }
+        .rep-attempt { font-size: 15px; margin-top: 3px; }
+        #reportPrintArea { display: none; }
+        @media print {
+            body.printing-report > *:not(#reportPrintArea) { display: none !important; }
+            body.printing-report #reportPrintArea { display: block !important; width: 100%; padding: 10px; }
+            body.printing-report { display: block; padding: 0; background: #fff; }
+        }
+        #choiceModal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 9999;
+            justify-content: center; align-items: center;
+        }
     </style>
     <script src="https://www.youtube.com/iframe_api"></script>
 </head>
@@ -368,6 +411,15 @@
     </div>
 </div>
 
+<!-- [תיקון 26] חלון בחירה כללי (המשך משחק, אישורים) -->
+<div id="choiceModal">
+    <div class="confirm-box">
+        <h3 id="choiceTitle" style="margin-top:0; color:#2196F3; font-size: 26px;"></h3>
+        <p id="choiceText" style="font-size: 20px;"></p>
+        <div id="choiceButtons" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+</div>
+
 <div id="app-container">
     <div class="top-nav">
         <h2 style="margin:0;" id="mainTitle">מצב עריכה</h2>
@@ -376,158 +428,240 @@
 
     <!-- ================= מצב עריכה ================= -->
     <div id="editPanel" class="panel active-panel">
-        
-        <div class="control-group" style="background-color: #e3f2fd;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0;">הפרויקטים שלי</h3>
-                <button class="btn-nav" onclick="startNewProject()" style="background-color: #fff; border: 2px solid #ffb300;">➕ פרויקט חדש</button>
-            </div>
-            <select id="projectSelect" onchange="loadSelectedProject()" style="margin-top: 15px;">
-                <option value="">-- בחר פרויקט קיים --</option>
-            </select>
-        </div>
-
-        <div class="control-group">
-            <h3>1. פרטי הפרויקט והסרטון</h3>
-            <label>שם הפרויקט:</label>
-            <input type="text" id="projectNameInput" placeholder="למשל: נינג'גו עונה 3 פרק 1" style="margin-bottom: 15px;">
-            <label>הדבק קישור יוטיוב:</label>
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <input type="text" id="ytInput" placeholder="https://www.youtube.com/watch?v=...">
-                <button class="btn-action" onclick="loadVideo('youtube')">טען סרטון</button>
-            </div>
-            <label style="display:block; margin-top:10px;">
-                <input type="checkbox" id="chkBlockSubtitles" checked style="transform: scale(1.5); margin-left: 10px;"> הפעל הסתרת כתוביות (פס שחור) במשחק
-            </label>
-            <!-- [תיקון 19] ניגון מלא: הסרטון מתנגן ברצף ונעצר רק בנקודות התרגילים -->
-            <label style="display:block; margin-top:10px;">
-                <input type="checkbox" id="chkFullPlay" style="transform: scale(1.5); margin-left: 10px;" onchange="saveSettingsIfProject()"> ניגון מלא של הסרטון במשחק (הסרטון מתנגן עד התרגיל, ואחרי תשובה נכונה ממשיך עד התרגיל הבא)
-            </label>
-        </div>
-
-        <div class="video-wrapper">
-            <div id="youtubePlayer"></div>
-            <video id="localPlayer" controls></video>
-            <div id="audioOnlyOverlay">🔊 משמיע סאונד בלבד...</div>
-            <div id="subtitleBlocker"></div> 
-        </div>
-        
-        <!-- תצוגת כתוביות חיה למסנכרן -->
-        <div id="liveSubtitleDisplay">-- תצוגת כתוביות חיה תופיע כאן --</div>
-
-        <div style="text-align: center; margin-bottom: 15px; background: #eee; padding: 10px; border-radius: 8px;">
-            <button class="btn-nav btn-small" onclick="seekRelative(-5)">⏪ אחורה 5 ש'</button>
-            <button class="btn-action btn-small" onclick="togglePlayPause()" style="margin: 0 10px;">⏯️ נגן / עצור</button>
-            <button class="btn-nav btn-small" onclick="seekRelative(5)">קדימה 5 ש' ⏩</button>
-        </div>
-
-        <div class="control-group" style="border: 2px solid #673ab7;">
-            <h3 style="color: #673ab7; margin-top:0;">🚀 טעינת כתוביות (SRT)</h3>
-            <p style="font-size: 14px; margin-top:0; margin-bottom: 5px;">טען קובץ כדי לקבל זיהוי אוטומטי של טקסט בזמן צפייה, או כדי לייצר סצנות מרובות:</p>
-            <div id="dropZone" class="drop-zone" onclick="document.getElementById('srtFileInput').click()">
-                <span id="dropZoneText">גרור קובץ או לחץ לבחירה 📁</span>
-                <input type="file" id="srtFileInput">
-            </div>
-            
-            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
-                <label style="font-size: 14px; font-weight: bold;">תיקון סנכרון זמנים לכתוביות (אם הן מקדימות/מאחרות):</label>
-                <div style="display:flex; gap: 5px; margin-top:5px;">
-                    <button class="btn-nav btn-small" onclick="shiftSrtTimes(-0.5)">הקדמה (-0.5 ש') ⏪</button>
-                    <button class="btn-nav btn-small" onclick="shiftSrtTimes(0.5)">איחור (+0.5 ש') ⏩</button>
-                </div>
-            </div>
-
-            <!-- [תיקון 20] מילון תיקונים לתמלול -->
-            <details style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
-                <summary style="font-weight: bold; cursor: pointer;">🔧 מילון תיקונים (מתקן מילים שהתמלול טועה בהן)</summary>
-                <p style="font-size: 14px; margin: 8px 0;">שורה לכל תיקון, בצורה: <b>מילה שגויה=מילה נכונה</b>. התיקונים חלים על כל הפרויקטים ועל קבצי SRT חדשים.</p>
-                <textarea id="correctionsInput" rows="5" placeholder="שגוי=נכון" style="direction: rtl;"></textarea>
-                <button class="btn-action btn-small" style="margin-top: 8px;" onclick="saveAndApplyCorrections()">שמור והחל על הסצנות והכתוביות 🔧</button>
-            </details>
-
-            <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות מכל הקובץ ⚡</button>
-        </div>
-
-        <div class="control-group">
-            <h3>או: יצירת סצנה באופן חופשי / מתוך הצפייה</h3>
-            <div class="time-controls-row">
-                <button class="btn-action" onclick="markTime('start')">סמן In</button>
-                <button class="btn-small" onclick="adjustInTime(-1)">-1ש'</button>
-                <button class="btn-small" onclick="adjustInTime(1)">+1ש'</button>
-                <span class="time-display" id="lblStart">0:00</span>
-                <span style="margin: 0 10px;">|</span>
-                <button class="btn-action" onclick="markTime('end')">סמן Out</button>
-                <button class="btn-small" onclick="adjustOutTime(-1)">-1ש'</button>
-                <button class="btn-small" onclick="adjustOutTime(1)">+1ש'</button>
-                <span class="time-display" id="lblEnd">0:00</span>
-            </div>
-            
-            <button class="btn-nav" onclick="previewSelectedClip()" style="margin-bottom: 15px; width: 100%;">▶️ נגן קטע נבחר לבדיקה</button>
-            
-            <input type="hidden" id="editSceneId" value="">
-            <label>משפט לסצנה:</label>
-            <input type="text" id="sceneText" placeholder="למשל: שָׁלוֹם נוֹעַם!">
-            
-            <div style="margin-top: 15px; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
-                <label style="font-weight: bold;">סוג המשימה לנועם:</label>
-                <div style="margin-top: 8px;">
-                    <input type="radio" name="taskType" id="typeTyping" value="typing"> 
-                    <label for="typeTyping">⌨️ הקלדה (עם בדיקה אוטומטית)</label>
-                </div>
-                <div style="margin-top: 8px;">
-                    <input type="radio" name="taskType" id="typeTracing" value="tracing" checked> 
-                    <label for="typeTracing">✏️ טרייסינג על קנבס</label>
+      <!-- [תיקון 22] שתי עמודות: משמאל סרטון קבוע, מימין לשוניות -->
+      <div id="editLayout">
+        <div id="editLeft">
+            <div id="editVideoSlot">
+                <div class="video-wrapper">
+                    <div id="youtubePlayer"></div>
+                    <video id="localPlayer" controls></video>
+                    <div id="audioOnlyOverlay">🔊 משמיע סאונד בלבד...</div>
+                    <div id="subtitleBlocker"></div> 
                 </div>
             </div>
             
-            <div style="margin-top: 10px;">
-                <label><input type="checkbox" id="chkShowInGame" style="transform: scale(1.5); margin-left: 10px;"> פעיל במשחק</label>
+            <!-- תצוגת כתוביות חיה למסנכרן -->
+            <div id="liveSubtitleDisplay">-- תצוגת כתוביות חיה תופיע כאן --</div>
+
+            <div style="text-align: center; margin-bottom: 15px; background: #eee; padding: 10px; border-radius: 8px;">
+                <button class="btn-nav btn-small" onclick="seekRelative(-5)">⏪ אחורה 5 ש'</button>
+                <button class="btn-action btn-small" onclick="togglePlayPause()" style="margin: 0 10px;">⏯️ נגן / עצור</button>
+                <button class="btn-nav btn-small" onclick="seekRelative(5)">קדימה 5 ש' ⏩</button>
             </div>
-            
-            <button class="btn-success btn-large" onclick="saveScene()">שמור סצנה ידנית</button>
         </div>
 
-        <div class="control-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h3 style="margin: 0;">סצנות בפרויקט:</h3>
-            </div>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                <button class="btn-action" style="flex: 1;" id="btnToggleAll" onclick="toggleAllScenes()">✅ הפעל את כל הסצנות</button>
-                <button class="btn-danger" style="flex: 1;" onclick="deleteAllScenesInProject()">מחק כל הסצנות 🗑️</button>
-                <button class="btn-danger" style="flex: 1; background-color: #b71c1c;" onclick="resetEntireSystem()">איפוס מערכת ⚠️</button>
-            </div>
-
-            <!-- [תיקון 18] סקירת סצנות וסינון סצנות שהילד דיווח עליהן -->
-            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center;">
-                <button class="btn-nav" style="flex: 1;" onclick="openReview()">🔍 סקירת סצנות</button>
-                <label style="flex: 1; cursor: pointer;"><input type="checkbox" id="chkOnlyReported" onchange="renderScenes()" style="transform: scale(1.4); margin-left: 8px;"> הצג רק סצנות שדווחו 🚩 <span id="reportedCount"></span></label>
+        <div id="editRight">
+            <div class="control-group" style="background-color: #e3f2fd;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">הפרויקטים שלי</h3>
+                    <button class="btn-nav" onclick="startNewProject()" style="background-color: #fff; border: 2px solid #ffb300;">➕ פרויקט חדש</button>
+                </div>
+                <select id="projectSelect" onchange="loadSelectedProject()" style="margin-top: 15px;">
+                    <option value="">-- בחר פרויקט קיים --</option>
+                </select>
             </div>
 
-            <div id="scenesListContainer">
-                <ul id="scenesList"></ul>
+            <div id="editTabs">
+                <button class="tab-btn active" data-tab="project" onclick="switchTab('project')">📁 פרויקט</button>
+                <button class="tab-btn" data-tab="subtitles" onclick="switchTab('subtitles')">📝 כתוביות</button>
+                <button class="tab-btn" data-tab="manual" onclick="switchTab('manual')">✂️ סצנה ידנית</button>
+                <button class="tab-btn" data-tab="scenes" onclick="switchTab('scenes')">🎬 סצנות</button>
+                <button class="tab-btn" data-tab="report" onclick="switchTab('report')">📋 דוח</button>
+                <button class="tab-btn" data-tab="system" onclick="switchTab('system')">⚙️ מערכת</button>
             </div>
-            
-            <button class="btn-nav btn-large" onclick="toggleMode()" style="margin-top: 10px;">מעבר למשחק 🎮</button>
+
+            <!-- ===== לשונית: פרויקט ===== -->
+            <div id="tab-project" class="tab-pane active">
+                <div class="control-group">
+                    <h3 style="margin-top:0;">פרטי הפרויקט והסרטון</h3>
+                    <label>שם הפרויקט:</label>
+                    <input type="text" id="projectNameInput" placeholder="למשל: נינג'גו עונה 3 פרק 1" style="margin-bottom: 15px;">
+                    <label>הדבק קישור יוטיוב:</label>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input type="text" id="ytInput" placeholder="https://www.youtube.com/watch?v=...">
+                        <button class="btn-action" onclick="loadVideo('youtube')">טען סרטון</button>
+                    </div>
+                    <label style="display:block; margin-top:10px;">
+                        <input type="checkbox" id="chkBlockSubtitles" checked style="transform: scale(1.5); margin-left: 10px;"> הפעל הסתרת כתוביות (פס שחור) במשחק
+                    </label>
+                    <!-- [תיקון 19] ניגון מלא: הסרטון מתנגן ברצף ונעצר רק בנקודות התרגילים -->
+                    <label style="display:block; margin-top:10px;">
+                        <input type="checkbox" id="chkFullPlay" style="transform: scale(1.5); margin-left: 10px;" onchange="saveSettingsIfProject()"> ניגון מלא של הסרטון במשחק (הסרטון מתנגן עד התרגיל, ואחרי תשובה נכונה ממשיך עד התרגיל הבא)
+                    </label>
+                </div>
+            </div>
+
+            <!-- ===== לשונית: כתוביות ===== -->
+            <div id="tab-subtitles" class="tab-pane">
+                <div class="control-group" style="border: 2px solid #673ab7;">
+                    <h3 style="color: #673ab7; margin-top:0;">🚀 טעינת כתוביות (SRT)</h3>
+                    <p style="font-size: 14px; margin-top:0; margin-bottom: 5px;">טען קובץ כדי לקבל זיהוי אוטומטי של טקסט בזמן צפייה, או כדי לייצר סצנות מרובות:</p>
+                    <div id="dropZone" class="drop-zone" onclick="document.getElementById('srtFileInput').click()">
+                        <span id="dropZoneText">גרור קובץ או לחץ לבחירה 📁</span>
+                        <input type="file" id="srtFileInput">
+                    </div>
+                    
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
+                        <label style="font-size: 14px; font-weight: bold;">תיקון סנכרון זמנים לכתוביות (אם הן מקדימות/מאחרות):</label>
+                        <div style="display:flex; gap:5px; margin-top:5px;">
+                            <button class="btn-nav btn-small" onclick="shiftSrtTimes(-0.5)">הקדמה (-0.5 ש') ⏪</button>
+                            <button class="btn-nav btn-small" onclick="shiftSrtTimes(0.5)">איחור (+0.5 ש') ⏩</button>
+                        </div>
+                    </div>
+
+                    <!-- [תיקון 20] מילון תיקונים לתמלול -->
+                    <details style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
+                        <summary style="font-weight: bold; cursor: pointer;">🔧 מילון תיקונים (מתקן מילים שהתמלול טועה בהן)</summary>
+                        <p style="font-size: 14px; margin: 8px 0;">שורה לכל תיקון, בצורה: <b>מילה שגויה=מילה נכונה</b>. התיקונים חלים על כל הפרויקטים ועל קבצי SRT חדשים.</p>
+                        <textarea id="correctionsInput" rows="5" placeholder="שגוי=נכון" style="direction: rtl;"></textarea>
+                        <button class="btn-action btn-small" style="margin-top: 8px;" onclick="saveAndApplyCorrections()">שמור והחל על הסצנות והכתוביות 🔧</button>
+                    </details>
+
+                    <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות מכל הקובץ ⚡</button>
+                </div>
+            </div>
+
+            <!-- ===== לשונית: סצנה ידנית ===== -->
+            <div id="tab-manual" class="tab-pane">
+                <div class="control-group">
+                    <h3 style="margin-top:0;">יצירת סצנה באופן חופשי / מתוך הצפייה</h3>
+                    <div class="time-controls-row">
+                        <button class="btn-action" onclick="markTime('start')">סמן In</button>
+                        <button class="btn-small" onclick="adjustInTime(-1)">-1ש'</button>
+                        <button class="btn-small" onclick="adjustInTime(1)">+1ש'</button>
+                        <span class="time-display" id="lblStart">0:00</span>
+                        <span style="margin: 0 10px;">|</span>
+                        <button class="btn-action" onclick="markTime('end')">סמן Out</button>
+                        <button class="btn-small" onclick="adjustOutTime(-1)">-1ש'</button>
+                        <button class="btn-small" onclick="adjustOutTime(1)">+1ש'</button>
+                        <span class="time-display" id="lblEnd">0:00</span>
+                    </div>
+                    
+                    <button class="btn-nav" onclick="previewSelectedClip()" style="margin-bottom: 15px; width: 100%;">▶️ נגן קטע נבחר לבדיקה</button>
+                    
+                    <input type="hidden" id="editSceneId" value="">
+                    <label>משפט לסצנה:</label>
+                    <input type="text" id="sceneText" placeholder="למשל: שָׁלוֹם נוֹעַם!">
+                    
+                    <div style="margin-top: 15px; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                        <label style="font-weight: bold;">סוג המשימה לנועם:</label>
+                        <div style="margin-top: 8px;">
+                            <input type="radio" name="taskType" id="typeTyping" value="typing"> 
+                            <label for="typeTyping">⌨️ הקלדה (עם בדיקה אוטומטית)</label>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <input type="radio" name="taskType" id="typeTracing" value="tracing" checked> 
+                            <label for="typeTracing">✏️ טרייסינג על קנבס</label>
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <input type="radio" name="taskType" id="typeFree" value="freewrite"> 
+                            <label for="typeFree">✍️ כתיבה חופשית (הילד מאשר בעצמו)</label>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 10px;">
+                        <label><input type="checkbox" id="chkShowInGame" style="transform: scale(1.5); margin-left: 10px;"> פעיל במשחק</label>
+                    </div>
+                    
+                    <button class="btn-success btn-large" onclick="saveScene()">שמור סצנה ידנית</button>
+                </div>
+            </div>
+
+            <!-- ===== לשונית: סצנות ===== -->
+            <div id="tab-scenes" class="tab-pane">
+                <div class="control-group">
+                    <h3 style="margin: 0 0 10px 0;">סצנות בפרויקט:</h3>
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                        <button class="btn-action" style="flex: 1;" id="btnToggleAll" onclick="toggleAllScenes()">✅ הפעל את כל הסצנות</button>
+                        <button class="btn-nav" style="flex: 1;" onclick="openReview()">🔍 סקירת סצנות</button>
+                    </div>
+
+                    <!-- [תיקון 27] המרה מהירה של סוג התרגיל -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; background: #fff; padding: 8px; border: 1px solid #ddd; border-radius: 8px;">
+                        <span style="font-weight: bold;">החלף סוג תרגיל:</span>
+                        <select id="bulkType" style="width: auto; margin-top: 0; padding: 8px;">
+                            <option value="typing">⌨️ הקלדה</option>
+                            <option value="tracing">✏️ טרייסינג</option>
+                            <option value="freewrite">✍️ כתיבה חופשית</option>
+                        </select>
+                        <label style="cursor: pointer;"><input type="checkbox" id="bulkOnlyActive" style="transform: scale(1.3); margin-left: 6px;"> רק פעילות</label>
+                        <button class="btn-action btn-small" onclick="applyBulkType()">החל</button>
+                    </div>
+
+                    <label style="display:block; margin-bottom: 12px; cursor: pointer;"><input type="checkbox" id="chkOnlyReported" onchange="renderScenes()" style="transform: scale(1.4); margin-left: 8px;"> הצג רק סצנות שדווחו 🚩 <span id="reportedCount"></span></label>
+
+                    <div id="scenesListContainer">
+                        <ul id="scenesList"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== לשונית: דוח ===== -->
+            <div id="tab-report" class="tab-pane">
+                <div class="control-group">
+                    <h3 style="margin: 0 0 8px 0;">📋 דוח משחק</h3>
+                    <div id="reportSummary" style="margin-bottom: 8px;"></div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <button class="btn-action btn-small" onclick="printReport()">🖨️ הדפס / שמור PDF</button>
+                        <button class="btn-nav btn-small" onclick="exportData({projects: false, report: true})">📤 ייצא דוח</button>
+                        <button class="btn-nav btn-small" onclick="document.getElementById('importFile').click()">📥 ייבא קובץ</button>
+                        <button class="btn-danger btn-small" onclick="clearAllLog()">🗑️ נקה דוח</button>
+                    </div>
+                    <div id="reportList"></div>
+                </div>
+            </div>
+
+            <!-- ===== לשונית: מערכת ===== -->
+            <div id="tab-system" class="tab-pane">
+                <div class="control-group">
+                    <h3 style="margin-top:0;">📤 גיבוי והעברה בין מכשירים</h3>
+                    <p style="font-size: 14px; margin-top: 0;">שמירת הנתונים לקובץ, למשל כדי להעביר פרויקטים ממחשב לאייפד, או דוח מהאייפד למחשב.</p>
+                    <label style="display:block; margin-bottom: 6px;"><input type="checkbox" id="chkExpProjects" checked style="transform: scale(1.3); margin-left: 8px;"> פרויקטים ומילון תיקונים</label>
+                    <label style="display:block; margin-bottom: 10px;"><input type="checkbox" id="chkExpReport" checked style="transform: scale(1.3); margin-left: 8px;"> דוח (כולל תמונות)</label>
+                    <div style="display:flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn-action" onclick="exportData({projects: document.getElementById('chkExpProjects').checked, report: document.getElementById('chkExpReport').checked})">📤 ייצא קובץ</button>
+                        <button class="btn-nav" onclick="document.getElementById('importFile').click()">📥 ייבא קובץ</button>
+                    </div>
+                </div>
+                <div class="control-group" style="border: 2px solid #ffcdd2;">
+                    <h3 style="margin-top:0; color:#b71c1c;">⚠️ אזור מסוכן</h3>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn-danger" style="flex: 1;" onclick="deleteAllScenesInProject()">מחק כל הסצנות 🗑️</button>
+                        <button class="btn-danger" style="flex: 1; background-color: #b71c1c;" onclick="resetEntireSystem()">איפוס מערכת ⚠️</button>
+                    </div>
+                </div>
+            </div>
         </div>
+      </div>
     </div>
 
     <!-- ================= מצב משחק ================= -->
     <div id="gamePanel" class="panel">
+        <!-- [תיקון 23] שורת כותרת: התקדמות מימין, כפתור גרירה לחזרה לעריכה משמאל -->
+        <div id="gameHeader">
+            <div class="progress-bar" id="gameProgress">סצנה 1 מתוך 5</div>
+            <div id="exitSlider"><div id="exitThumb">⚙️</div><span>גרור ימינה כדי לחזור לעריכה</span></div>
+        </div>
         <!-- [תיקון 16] עמודת כפתורים בצד ימין והסרטון משמאל. המאזינים של הכפתורים מוגדרים בסקריפט -->
         <div id="gameTop">
             <div id="gameSide">
-                <div class="progress-bar" id="gameProgress">סצנה 1 מתוך 5</div>
                 <button class="btn-action game-btn" id="btnPlayAudio">השמע משפט 🔊</button>
                 <button class="btn-nav game-btn hidden" id="btnHint">💡 רמז</button>
                 <button class="btn-nav game-btn hidden" id="btnToggleEraser" onclick="toggleEraser()">מחק 🧽</button>
-                <button class="btn-danger game-btn hidden" id="btnClearCanvas" onclick="resizeCanvas()">נקה לוח 🗑️</button>
+                <button class="btn-danger game-btn hidden" id="btnClearCanvas" onclick="clearBoard()">נקה לוח 🗑️</button>
                 <button class="btn-success game-btn" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
                 <button class="btn-nav game-btn" id="btnReport" style="background-color:#ffe0b2;">🚩 יש טעות</button>
                 <button class="btn-nav game-btn hidden" id="btnSkipPlay">⏭ דלג להמשך</button>
-                <button class="game-btn" id="btnExitGame" style="background-color:#e0e0e0;" onclick="toggleMode()">⚙️ חזור לעריכה</button>
             </div>
             <div id="gameVideoPlaceholder"></div>
+        </div>
+
+        <!-- [תיקון 24] כתיבה חופשית: המשפט הנכון נחשף, והילד מאשר אם כתב נכון -->
+        <div id="selfCheckPanel" class="hidden">
+            <button class="btn-success game-btn" id="btnSelfOk">✔ כתבתי נכון</button>
+            <div class="sc-text" id="selfCheckText"></div>
+            <button class="btn-danger game-btn" id="btnSelfWrong">✘ לא נכון</button>
         </div>
         
         <div class="notebook-area" id="notebookArea">
@@ -546,6 +680,9 @@
         <button class="btn-action btn-large hidden" id="btnNextScene" onclick="nextScene()">המשך לסצנה הבאה ➡️</button>
     </div>
 </div>
+
+<div id="reportPrintArea"></div>
+<input type="file" id="importFile" accept=".json,application/json" style="display:none">
 
 <script>
     let currentMode = 'edit';
@@ -590,6 +727,12 @@
     let caretPos = 0;             // [תיקון 17] מיקום הסמן בטקסט
     let previewTimer = null;      // [תיקון 21] ניגון תצוגה מקדימה של סצנה
     let reviewIndex = 0;          // [תיקון 18] הסצנה הנוכחית במצב סקירה
+    const LOG_KEY = 'ninjagoLog';           // [תיקון 25] דוח המשחק (רשימת תרגילים ומה שהילד עשה)
+    const IMG_KEY = 'ninjagoImages';        // [תיקון 25] תמונות של כתיבת הילד (נשמרות בנפרד מהפרויקטים)
+    const PROGRESS_KEY = 'ninjagoProgress'; // [תיקון 28] התקדמות במשחק לכל פרויקט
+    const LOG_MAX = 1500;                   // כמה רשומות דוח נשמרות לכל היותר (הישנות נמחקות)
+    const IMG_MAX = 200;                    // כמה תמונות נשמרות לכל היותר (הישנות נמחקות)
+    let currentSession = null, currentRecord = null, practice = null, logCache = null, imageStore = null;
 
     const ytElement = document.getElementById('youtubePlayer');
     const localElement = document.getElementById('localPlayer');
@@ -1026,7 +1169,7 @@
 
             scenes.push({
                 id: Date.now() + Math.random() + i,
-                start: s, end: e, text: u.text, tracing: tracing, show: false
+                start: s, end: e, text: u.text, type: taskType, tracing: tracing, show: false
             });
             created++;
         });
@@ -1053,7 +1196,7 @@
 
         const sceneObj = {
             id: editId ? parseFloat(editId) : (Date.now() + Math.random()), 
-            start: tempStart, end: tempEnd, text: text, tracing: tracing, show: show
+            start: tempStart, end: tempEnd, text: text, type: taskType, tracing: tracing, show: show
         };
 
         if (editId) {
@@ -1117,7 +1260,7 @@
         tempEnd = s.end;
         updateTimeDisplay();
         document.getElementById('sceneText').value = s.text;
-        document.getElementById(s.tracing ? 'typeTracing' : 'typeTyping').checked = true;
+        document.getElementById({ typing: 'typeTyping', tracing: 'typeTracing', freewrite: 'typeFree' }[sceneType(s)]).checked = true;
         document.getElementById('chkShowInGame').checked = s.show;
         document.getElementById('editSceneId').value = s.id;
     }
@@ -1186,7 +1329,7 @@
                                 <div>
                                     <strong>סצנה ${i+1}:</strong> ${formatTimePrecise(s.start)} - ${formatTimePrecise(s.end)}<br> 
                                     "${escapeHtml(s.text)}" <br> 
-                                    <span style="font-size: 14px; color: #666;">${s.tracing ? '✏️ טרייסינג' : '⌨️ הקלדה'}</span>
+                                    <select onchange="setSceneTypeById(${s.id}, this.value)" style="width:auto; margin-top:2px; padding:3px 6px; font-size:14px;">${typeOptionsHtml(sceneType(s))}</select>
                                     ${reportHtml}
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
@@ -1234,6 +1377,8 @@
             if (scenes.filter(s => s.show).length === 0) { alert("אין סצנות פעילות למשחק פרויקט זה."); return; }
             currentMode = 'game';
             fullPlayMode = document.getElementById('chkFullPlay').checked; // [תיקון 19]
+            currentSession = { id: Date.now() };  // [תיקון 25] הפעלה חדשה בדוח
+            practice = null;
             
             // שליטה בפס השחור לפי ההגדרה מהעריכה
             const blocker = document.getElementById('subtitleBlocker');
@@ -1266,7 +1411,9 @@
             hideHint();
             document.getElementById('mainTitle').innerText = "מצב עריכה";
             document.getElementById('modeToggleBtn').innerText = "מעבר למשחק 🎮";
-            document.getElementById('editPanel').insertBefore(editVideoWrapper, document.getElementById('editPanel').children[2]);
+            document.getElementById('editVideoSlot').appendChild(editVideoWrapper); // [תיקון 22] הסרטון חוזר לעמודה השמאלית
+            hideSelfCheck();
+            practice = null;
             document.getElementById('subtitleBlocker').style.display = 'none'; // תמיד כבוי בעריכה
             pauseVideo();
         }
@@ -1274,10 +1421,38 @@
 
     function getActiveScenes() { return scenes.filter(s => s.show).sort((a,b) => a.start - b.start); }
 
+    // [תיקון 28] כניסה למשחק: אם יש התקדמות שמורה, שואלים אם להמשיך או להתחיל מההתחלה
     function startGame() {
-        currentGameIndex = 0;
-        if (fullPlayMode) startFullPlayIntro();
-        else loadGameScene();
+        const list = getActiveScenes();
+        const prog = getProgress();
+        let idx = -1;
+        if (prog) {
+            idx = list.findIndex(s => s.id === prog.sceneId);
+            if (idx < 0) idx = Math.min(prog.index || 0, list.length - 1);
+        }
+        if (idx > 0) {
+            showChoice("ממשיכים מאיפה שעצרנו?", "בפעם הקודמת הגעת לסצנה " + (idx + 1) + " מתוך " + list.length + ".", [
+                { label: "▶ להמשיך מסצנה " + (idx + 1), cls: "btn-success", fn: () => beginGameAt(idx) },
+                { label: "↺ להתחיל מההתחלה", cls: "btn-nav", fn: () => { clearProgress(); beginGameAt(0); } }
+            ]);
+        } else {
+            beginGameAt(0);
+        }
+    }
+    function beginGameAt(idx) {
+        currentGameIndex = idx;
+        if (fullPlayMode && idx === 0) {
+            startFullPlayIntro();
+        } else if (fullPlayMode) {
+            // ממשיכים באמצע: קופצים ישר לנקודת התרגיל (ההפעלה נעשתה בלחיצה של המשתמש)
+            const sc = getActiveScenes()[idx];
+            seekTo(sc.start);
+            playVideo();
+            setTimeout(pauseVideo, 150);
+            loadGameScene();
+        } else {
+            loadGameScene();
+        }
     }
 
     // [תיקון 19] מצב ניגון מלא: מתחילים בניגון הסרטון עד תחילת התרגיל הראשון
@@ -1351,25 +1526,29 @@
         cb();
     }
 
-    function loadGameScene() {
+    function loadGameScene(opts) {
         const activeScenes = getActiveScenes();
         if (currentGameIndex >= activeScenes.length) {
             setPlayingVideoUI(false);
+            hideSelfCheck();
+            clearProgress(); // [תיקון 28] סיימנו את כל הסצנות: מתחילים מההתחלה בפעם הבאה
             showGameMessage("כל הכבוד נועם! 🎉", "סיימת את כל הסצנות!", () => toggleMode());
             return;
         }
 
         const scene = activeScenes[currentGameIndex];
         document.getElementById('gameProgress').innerText = `סצנה ${currentGameIndex + 1} מתוך ${activeScenes.length}`;
+        saveProgress(currentGameIndex, scene.id); // [תיקון 28] זוכרים איפה הילד נמצא
         
         setPlayingVideoUI(false); // [תיקון 19] חוזרים ממסך "הסרטון מתנגן" למסך התרגיל
+        hideSelfCheck();
         document.getElementById('btnNextScene').classList.add('hidden');
         hideHint();
         document.getElementById('btnPlayAudio').classList.remove('hidden');
         document.getElementById('btnDoneWriting').classList.remove('hidden');
         document.getElementById('btnReport').classList.remove('hidden');
         
-        if (!fullPlayMode) {
+        if (!fullPlayMode && !(opts && opts.keepVideo)) {
             // תיקון ניגון סצנה לא נכונה: קופץ, מנגן רגע כדי לטעון פריים, ועוצר
             // (במצב ניגון מלא הסרטון כבר נעצר בדיוק בנקודת התרגיל, ולכן לא צריך)
             seekTo(scene.start);
@@ -1382,12 +1561,18 @@
         const typedEl = document.getElementById('typedDisplay');
         const clearBtn = document.getElementById('btnClearCanvas');
         const eraserBtn = document.getElementById('btnToggleEraser');
-        
         const hintBtn = document.getElementById('btnHint');
         const keyboardEl = document.getElementById('onScreenKeyboard');
         const areaEl = document.getElementById('notebookArea');
+        const ruleEl = areaEl.querySelector('.notebook-line');
 
-        if (scene.tracing) {
+        // [תיקון 24] סוג התרגיל. אחרי "לא נכון" בכתיבה חופשית הסצנה הופכת זמנית לטרייסינג (תרגול)
+        const baseType = sceneType(scene);
+        if (practice && practice.sceneId !== scene.id) practice = null;
+        const type = (practice && practice.sceneId === scene.id) ? 'tracing' : baseType;
+        if (!(opts && opts.keepRecord)) newRecord(scene, baseType); // [תיקון 25] רשומה חדשה בדוח
+
+        if (type === 'tracing') {
             // [תיקון 10] הטקסט נשמר כאן, ו-fitFadedText בונה ממנו שורה אחת או שתיים בגודל הגדול ביותר שנכנס
             faded.dataset.text = scene.text;
             faded.dataset.lines = '';
@@ -1399,15 +1584,30 @@
             hintBtn.classList.add('hidden');
             keyboardEl.classList.add('hidden');
             appContainer.classList.remove('typing-task');
+            ruleEl.style.bottom = '';
             fitFadedText();
             setTimeout(() => { resizeCanvas(); layoutGame(); }, 50); // השהיה קלה לחישוב מדויק של המסך למניעת תקיעת העט
             // [תיקון 7] מחכים לטעינת הפונט ואז מתאימים שוב את גודל הטקסט
             if (document.fonts && document.fonts.load) { document.fonts.load("40px GveretLevin", scene.text).then(() => { fitFadedText(); layoutGame(); }).catch(() => {}); }
+        } else if (type === 'freewrite') {
+            // [תיקון 24] כתיבה חופשית: לוח ריק עם קו כתיבה, בלי המשפט. אחרי "סיימתי" המשפט נחשף והילד מאשר
+            faded.classList.add('hidden');
+            canvasEl.classList.remove('hidden');
+            typedEl.classList.add('hidden');
+            clearBtn.classList.remove('hidden');
+            eraserBtn.classList.remove('hidden');
+            hintBtn.classList.add('hidden');
+            keyboardEl.classList.add('hidden');
+            appContainer.classList.remove('typing-task');
+            areaEl.classList.remove('tracing-mode');
+            areaEl.style.height = '230px';
+            ruleEl.style.bottom = '';
+            setTimeout(() => { resizeCanvas(); layoutGame(); }, 50);
         } else {
             faded.classList.add('hidden');
             canvasEl.classList.add('hidden');
             typedEl.classList.remove('hidden');
-            clearBtn.classList.add('hidden');
+            clearBtn.classList.remove('hidden');     // [תיקון 29] "נקה לוח" גם בהקלדה
             eraserBtn.classList.add('hidden');
             hintBtn.classList.remove('hidden');      // [תיקון 13] כפתור רמז רק בתרגיל הקלדה
             keyboardEl.classList.remove('hidden');   // [תיקון 12] מקלדת קבועה רק בתרגיל הקלדה
@@ -1641,16 +1841,26 @@
 
     function checkTask() {
         const scene = getActiveScenes()[currentGameIndex];
+        const type = currentTaskType();
 
-        if (scene.tracing) {
-            if (validateTracing()) {
+        if (type === 'tracing') {
+            const ok = validateTracing();
+            recordAttempt({ ok: ok, img: practice ? null : captureCanvasImage(), practice: !!practice });
+            if (ok) {
+                finishRecord('correct');
                 rewardAndPlayFullVideo();
             } else {
                 showGameMessage("נסה שוב", "נראה שפספסת קצת... נסה לעבור שוב על האותיות בתוך הקווים! ✏️");
             }
+        } else if (type === 'freewrite') {
+            if (!hasInk()) { showGameMessage("כתוב קודם ✍️", "כתוב את המשפט על הלוח, ואז לחץ על \"סיימתי\"."); return; }
+            openSelfCheck(scene);
         } else {
             const userInput = document.getElementById('keyboardInput').value;
-            if (normalizeHebrew(userInput) === normalizeHebrew(scene.text)) {
+            const ok = normalizeHebrew(userInput) === normalizeHebrew(scene.text);
+            recordAttempt({ ok: ok, typed: userInput.trim() });
+            if (ok) {
+                finishRecord('correct');
                 rewardAndPlayFullVideo();
             } else {
                 showGameMessage("נסה שוב", "כמעט נכון! נסה לבדוק שוב את האותיות.");
@@ -1668,6 +1878,7 @@
         document.getElementById('btnReport').classList.add('hidden');
         document.getElementById('onScreenKeyboard').classList.add('hidden');
         hideHint();
+        hideSelfCheck();
         overlay.style.display = 'none';  // אם נלחץ "סיימתי" באמצע "השמע משפט": מסירים את המסך השחור
         playingAudioOnly = false;
         
@@ -1921,6 +2132,7 @@
         }
         if (caretPos >= typedText.length) disp.appendChild(caretEl());
         document.getElementById('keyboardInput').value = typedText; // הערך לבדיקת התשובה
+        alignTypingRule();
     }
     function setTyped(text, pos) {
         typedText = text;
@@ -1948,12 +2160,13 @@
     }
     function showHint() {
         const scene = getActiveScenes()[currentGameIndex];
-        if (!scene || scene.tracing) return;
+        if (!scene || currentTaskType() !== 'typing') return;
         const box = document.getElementById('hintBox');
         box.textContent = scene.text;
         box.classList.remove('hidden');
         if (hintTimer) clearTimeout(hintTimer);
         hintTimer = setTimeout(hideHint, HINT_SECONDS * 1000);
+        if (currentRecord) { currentRecord.hints++; saveRecord(); } // [תיקון 25] נספר בדוח
     }
     document.getElementById('btnHint').addEventListener('click', showHint);
 
@@ -1972,12 +2185,16 @@
         const kids = Array.from(side.children).filter(c => !c.classList.contains('hidden'));
         const sideH = kids.reduce((a, c) => a + c.offsetHeight, 0) + 6 * Math.max(0, kids.length - 1);
         const maxW = Math.max(200, document.getElementById('gameTop').clientWidth - 190 - 12);
-        const avail = vh - 28 - 8 - 6 - 6 - areaH - kbTotal;
+        const headerH = document.getElementById('gameHeader').offsetHeight + 6;
+        const selfPanel = document.getElementById('selfCheckPanel');
+        const selfH = selfPanel.classList.contains('hidden') ? 0 : selfPanel.offsetHeight + 6;
+        const avail = vh - 28 - 8 - 6 - 6 - areaH - kbTotal - headerH - selfH;
         let videoH = Math.max(150, Math.min(avail, maxW * 9 / 16));
         videoH = Math.min(Math.max(videoH, sideH), maxW * 9 / 16); // אם עמודת הכפתורים גבוהה יותר, הסרטון מתרחב אליה בחינם
         videoH = Math.round(videoH);
         editVideoWrapper.style.height = videoH + 'px';
         editVideoWrapper.style.width = Math.round(videoH * 16 / 9) + 'px';
+        alignTypingRule();
     }
 
     // ================= [תיקון 18] דיווח על טעות (הילד) וסקירה (ההורה) =================
@@ -1986,7 +2203,8 @@
     function openReport() {
         const scene = getActiveScenes()[currentGameIndex];
         if (!scene) return;
-        const typed = (!scene.tracing && typedText.trim()) ? typedText.trim() : '';
+        const isTypingTask = currentTaskType() === 'typing';
+        const typed = (isTypingTask && typedText.trim()) ? typedText.trim() : '';
         const withBtn = document.getElementById('btnReportWithText');
         if (typed) {
             withBtn.textContent = 'דווח, ושלח גם את מה שכתבתי: ' + typed;
@@ -1994,7 +2212,7 @@
             document.getElementById('reportText').textContent = 'אם כתבת את המשפט כמו שנשמע לך נכון, אפשר לשלוח אותו להורה.';
         } else {
             withBtn.classList.add('hidden');
-            document.getElementById('reportText').textContent = scene.tracing
+            document.getElementById('reportText').textContent = !isTypingTask
                 ? 'נשלח להורה שיש טעות במשפט הזה.'
                 : 'נשלח להורה שיש טעות במשפט הזה. אפשר קודם לכתוב את המשפט כמו שנשמע לך נכון, ואז ללחוץ שוב על "יש טעות".';
         }
@@ -2012,6 +2230,11 @@
             if (txt && !scene.suggestions.includes(txt)) scene.suggestions.push(txt);
         }
         saveSettingsIfProject();
+        if (currentRecord) { // [תיקון 25] נרשם בדוח
+            currentRecord.result = 'reported';
+            if (withText && typedText.trim()) currentRecord.reportText = typedText.trim();
+            saveRecord();
+        }
         rewardAndPlayFullVideo(); // הילד לא נתקע: ממשיכים לסרטון ולסצנה הבאה
     }
     function clearReport(s) { s.reportCount = 0; s.suggestions = []; }
@@ -2177,12 +2400,431 @@
         alert(total ? ('בוצעו ' + total + ' החלפות (בכתוביות ובסצנות).') : 'לא נמצאו מילים להחלפה.');
     }
 
+    // ================= [תיקון 27] סוגי תרגיל: הקלדה / טרייסינג / כתיבה חופשית =================
+    const TYPE_LABEL = { typing: '⌨️ הקלדה', tracing: '✏️ טרייסינג', freewrite: '✍️ כתיבה חופשית' };
+    // סצנות ישנות נשמרו עם tracing בלבד, לכן הסוג נגזר ממנו כשאין שדה type
+    function sceneType(s) { return s.type || (s.tracing ? 'tracing' : 'typing'); }
+    function setSceneType(s, type) { s.type = type; s.tracing = (type === 'tracing'); }
+    function typeOptionsHtml(sel) {
+        return ['typing', 'tracing', 'freewrite'].map(v => `<option value="${v}" ${v === sel ? 'selected' : ''}>${TYPE_LABEL[v]}</option>`).join('');
+    }
+    function setSceneTypeById(id, type) {
+        const s = scenes.find(x => x.id === id);
+        if (!s) return;
+        setSceneType(s, type);
+        const cont = document.getElementById('scenesListContainer');
+        const top = cont.scrollTop;
+        saveData();
+        cont.scrollTop = top;
+    }
+    function applyBulkType() {
+        const type = document.getElementById('bulkType').value;
+        const onlyActive = document.getElementById('bulkOnlyActive').checked;
+        const targets = scenes.filter(s => !onlyActive || s.show);
+        if (targets.length === 0) { alert("אין סצנות להחלפה."); return; }
+        openConfirmModal("החלפת סוג תרגיל", "להחליף " + targets.length + " סצנות ל" + TYPE_LABEL[type] + "?", () => {
+            targets.forEach(s => setSceneType(s, type));
+            saveData();
+        });
+    }
+    // סוג התרגיל הנוכחי במשחק (בתרגול אחרי "לא נכון" בכתיבה חופשית זה טרייסינג)
+    function currentTaskType() {
+        const sc = getActiveScenes()[currentGameIndex];
+        if (!sc) return 'typing';
+        return (practice && practice.sceneId === sc.id) ? 'tracing' : sceneType(sc);
+    }
+    function clearBoard() {
+        if (currentTaskType() === 'typing') setTyped('', 0);
+        else resizeCanvas();
+    }
+
+    // חלון בחירה כללי: כותרת, טקסט וכפתורים
+    function showChoice(title, msg, buttons) {
+        document.getElementById('choiceTitle').innerText = title;
+        document.getElementById('choiceText').innerText = msg;
+        const box = document.getElementById('choiceButtons');
+        box.innerHTML = '';
+        buttons.forEach(b => {
+            const el = document.createElement('button');
+            el.className = b.cls || 'btn-action';
+            el.style.fontSize = '20px';
+            el.textContent = b.label;
+            el.addEventListener('click', () => {
+                document.getElementById('choiceModal').style.display = 'none';
+                if (b.fn) b.fn();
+            });
+            box.appendChild(el);
+        });
+        document.getElementById('choiceModal').style.display = 'flex';
+    }
+
+    // ================= [תיקון 25] תמונות, דוח ורשומות =================
+    function hasInk() {
+        const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        for (let i = 3; i < d.length; i += 4) { if (d[i] > 50) return true; }
+        return false;
+    }
+    // תמונה מכווצת של מה שהילד כתב (רקע לבן, JPEG), כדי לא לתפוס הרבה מקום
+    function captureCanvasImage() {
+        const maxW = 520;
+        const scale = Math.min(1, maxW / canvas.width);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(canvas.width * scale));
+        c.height = Math.max(1, Math.round(canvas.height * scale));
+        const x = c.getContext('2d');
+        x.fillStyle = '#fff';
+        x.fillRect(0, 0, c.width, c.height);
+        x.drawImage(canvas, 0, 0, c.width, c.height);
+        return c.toDataURL('image/jpeg', 0.6);
+    }
+
+    function loadLog() {
+        if (logCache === null) {
+            try { logCache = JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (e) { logCache = []; }
+            if (!Array.isArray(logCache)) logCache = [];
+        }
+        return logCache;
+    }
+    function persistLog() {
+        const log = loadLog();
+        while (log.length > LOG_MAX) log.shift();
+        for (let i = 0; i < 6; i++) {
+            try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); return; }
+            catch (err) { log.splice(0, Math.max(1, Math.ceil(log.length * 0.2))); } // נגמר המקום: מוחקים את הישנים
+        }
+    }
+    function loadImages() {
+        if (imageStore === null) {
+            try { imageStore = JSON.parse(localStorage.getItem(IMG_KEY) || 'null'); } catch (e) { imageStore = null; }
+            if (!imageStore || !Array.isArray(imageStore.order) || typeof imageStore.map !== 'object') imageStore = { order: [], map: {} };
+        }
+        return imageStore;
+    }
+    function persistImages() {
+        const st = loadImages();
+        for (let i = 0; i < 60; i++) {
+            try { localStorage.setItem(IMG_KEY, JSON.stringify(st)); return; }
+            catch (err) { if (!st.order.length) return; delete st.map[st.order.shift()]; } // נגמר המקום: מוחקים את הישנות
+        }
+    }
+    function storeImage(dataUrl) {
+        const st = loadImages();
+        const id = 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        st.map[id] = dataUrl;
+        st.order.push(id);
+        while (st.order.length > IMG_MAX) delete st.map[st.order.shift()];
+        persistImages();
+        return id;
+    }
+    function removeImage(id) {
+        const st = loadImages();
+        delete st.map[id];
+        st.order = st.order.filter(x => x !== id);
+        persistImages();
+    }
+    function getImage(id) {
+        const url = loadImages().map[id];
+        return (typeof url === 'string' && url.indexOf('data:image/jpeg;base64,') === 0) ? url : null;
+    }
+
+    // רשומה אחת = תרגיל אחד שהילד קיבל (עם כל הניסיונות שלו)
+    function newRecord(scene, type) {
+        if (!currentSession) currentSession = { id: Date.now() };
+        currentRecord = {
+            id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            ts: Date.now(), session: currentSession.id, project: currentProjectName,
+            sceneId: scene.id, expected: scene.text, type: type,
+            attempts: [], hints: 0, result: 'unfinished'
+        };
+    }
+    function saveRecord() {
+        if (!currentRecord) return;
+        const log = loadLog();
+        const i = log.findIndex(r => r.id === currentRecord.id);
+        if (i >= 0) log[i] = currentRecord; else log.push(currentRecord);
+        persistLog();
+    }
+    function recordAttempt(a) {
+        if (!currentRecord) return;
+        a.ts = Date.now();
+        if (a.img) {
+            if (currentRecord.img) removeImage(currentRecord.img); // שומרים רק את התמונה האחרונה של התרגיל
+            currentRecord.img = storeImage(a.img);
+        }
+        delete a.img;
+        currentRecord.attempts.push(a);
+        saveRecord();
+    }
+    function finishRecord(result) {
+        if (!currentRecord) return;
+        if (currentRecord.result !== 'self-wrong') currentRecord.result = result; // "לא נכון" שהילד סימן נשאר גם אחרי התרגול
+        saveRecord();
+    }
+
+    // ================= [תיקון 28] התקדמות במשחק =================
+    function loadProgressAll() {
+        try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+    function getProgress() { return loadProgressAll()[currentProjectName] || null; }
+    function saveProgress(index, sceneId) {
+        if (!currentProjectName) return;
+        const all = loadProgressAll();
+        all[currentProjectName] = { index: index, sceneId: sceneId, ts: Date.now() };
+        try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(all)); } catch (e) {}
+    }
+    function clearProgress() {
+        const all = loadProgressAll();
+        delete all[currentProjectName];
+        try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(all)); } catch (e) {}
+    }
+
+    // ================= [תיקון 24] כתיבה חופשית: אישור עצמי =================
+    function openSelfCheck(scene) {
+        recordAttempt({ self: true, img: captureCanvasImage() });
+        document.getElementById('selfCheckText').textContent = scene.text;
+        document.getElementById('selfCheckPanel').classList.remove('hidden');
+        ['btnDoneWriting', 'btnToggleEraser', 'btnClearCanvas'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        layoutGame();
+    }
+    function hideSelfCheck() {
+        const panel = document.getElementById('selfCheckPanel');
+        if (panel) panel.classList.add('hidden');
+    }
+    function selfCheckResult(ok) {
+        const scene = getActiveScenes()[currentGameIndex];
+        if (currentRecord && currentRecord.attempts.length) currentRecord.attempts[currentRecord.attempts.length - 1].selfOk = ok;
+        hideSelfCheck();
+        if (ok) {
+            finishRecord('self-correct');
+            rewardAndPlayFullVideo();
+        } else {
+            if (currentRecord) { currentRecord.result = 'self-wrong'; saveRecord(); }
+            practice = { sceneId: scene.id }; // מתרגלים את המשפט הנכון בטרייסינג ואז ממשיכים
+            showGameMessage("לא נורא! 💪", "עכשיו נעבור על המשפט הנכון עם האצבע.", () => loadGameScene({ keepVideo: true, keepRecord: true }));
+        }
+    }
+    document.getElementById('btnSelfOk').addEventListener('click', () => selfCheckResult(true));
+    document.getElementById('btnSelfWrong').addEventListener('click', () => selfCheckResult(false));
+
+    // ================= [תיקון 23] כפתור גרירה לחזרה לעריכה =================
+    (function initExitSlider() {
+        const track = document.getElementById('exitSlider');
+        const thumb = document.getElementById('exitThumb');
+        let dragging = false, startX = 0, maxX = 0, curX = 0;
+        const setX = (x) => { curX = x; thumb.style.transform = 'translateX(' + x + 'px)'; };
+        thumb.addEventListener('pointerdown', (e) => {
+            dragging = true;
+            startX = e.clientX;
+            maxX = track.clientWidth - thumb.offsetWidth - 6;
+            thumb.style.transition = 'none';
+            if (thumb.setPointerCapture && e.pointerId !== undefined) { try { thumb.setPointerCapture(e.pointerId); } catch (err) {} }
+            e.preventDefault();
+        });
+        thumb.addEventListener('pointermove', (e) => {
+            if (!dragging) return;
+            setX(Math.max(0, Math.min(maxX, e.clientX - startX)));
+        });
+        const finish = (e) => {
+            if (!dragging) return;
+            dragging = false;
+            const reached = curX >= maxX * 0.85 && maxX > 0;
+            thumb.style.transition = 'transform 0.2s';
+            setX(0);
+            if (reached) toggleMode(); // רק גרירה עד הקצה מחזירה לעריכה
+        };
+        thumb.addEventListener('pointerup', finish);
+        thumb.addEventListener('pointercancel', () => { dragging = false; thumb.style.transition = 'transform 0.2s'; setX(0); });
+    })();
+
+    // ================= [תיקון 22] לשוניות במסך העריכה =================
+    function switchTab(name) {
+        if (!document.getElementById('tab-' + name)) name = 'project';
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+        try { localStorage.setItem('ninjagoTab', name); } catch (e) {}
+        if (name === 'report') renderReport();
+    }
+
+    // ================= [תיקון 30] קו הכתיבה בהקלדה צמוד לשורת הבסיס האמיתית של האותיות =================
+    // בעבר הקו היה במקום קבוע, והאותיות ישבו חלקית מתחתיו. עכשיו מודדים איפה האותיות באמת יושבות.
+    function alignTypingRule() {
+        const area = document.getElementById('notebookArea');
+        const line = area.querySelector('.notebook-line');
+        const disp = document.getElementById('typedDisplay');
+        if (!line) return;
+        if (disp.classList.contains('hidden')) return;
+        const probe = document.createElement('span');
+        probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
+        disp.appendChild(probe);
+        const baseline = probe.getBoundingClientRect().bottom;
+        disp.removeChild(probe);
+        const fromBottom = area.getBoundingClientRect().bottom - baseline;
+        if (isFinite(fromBottom) && fromBottom > 0 && fromBottom < area.offsetHeight) line.style.bottom = Math.round(fromBottom) + 'px';
+    }
+
+    // ================= [תיקון 25] מסך הדוח =================
+    function fmtDate(ts) {
+        const d = new Date(ts);
+        return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+    }
+    function badgeFor(r) {
+        switch (r.result) {
+            case 'correct': return { k: 'good', label: '✔ נכון' };
+            case 'self-correct': return { k: 'good', label: '✔ הילד סימן: כתבתי נכון' };
+            case 'self-wrong': return { k: 'bad', label: '✘ הילד סימן: לא נכון' };
+            case 'reported': return { k: 'flag', label: '🚩 דווח על טעות' };
+            default: return { k: 'none', label: '⏸ לא הסתיים' };
+        }
+    }
+    function reportItemHtml(r) {
+        const b = badgeFor(r);
+        const attempts = r.attempts || [];
+        let h = '<div class="rep-item"><div><span class="rep-expected">' + escapeHtml(r.expected) + '</span><span class="rep-badge rep-' + b.k + '">' + b.label + '</span></div>';
+        h += '<div style="font-size:14px;color:#607d8b;">' + (TYPE_LABEL[r.type] || '') + (attempts.length ? ' · ניסיונות: ' + attempts.length : '') + (r.hints ? ' · 💡 רמזים: ' + r.hints : '') + '</div>';
+        attempts.forEach(a => {
+            if (a.typed !== undefined) h += '<div class="rep-attempt">' + (a.ok ? '✔' : '✘') + ' הילד כתב: "' + escapeHtml(a.typed) + '"</div>';
+        });
+        if (r.reportText) h += '<div class="rep-attempt">🚩 הילד הציע: "' + escapeHtml(r.reportText) + '"</div>';
+        const img = r.img ? getImage(r.img) : null;
+        if (img) h += '<img class="rep-img" src="' + img + '" alt="">';
+        return h + '</div>';
+    }
+    function renderReport() {
+        const listEl = document.getElementById('reportList');
+        const sumEl = document.getElementById('reportSummary');
+        if (!listEl) return;
+        const log = loadLog();
+        if (!log.length) {
+            sumEl.innerHTML = '';
+            listEl.innerHTML = '<p>עדיין אין נתונים. הדוח יתמלא אחרי שהילד ישחק.</p>';
+            return;
+        }
+        const counts = { good: 0, bad: 0, flag: 0, none: 0 };
+        log.forEach(r => { counts[badgeFor(r).k]++; });
+        sumEl.innerHTML = '<strong>' + log.length + '</strong> תרגילים · ✔ ' + counts.good + ' · ✘ ' + counts.bad + ' · 🚩 ' + counts.flag + ' · ⏸ ' + counts.none;
+        const sessions = {};
+        log.forEach(r => { (sessions[r.session] = sessions[r.session] || []).push(r); });
+        const ids = Object.keys(sessions).sort((a, b) => b - a); // ההפעלה החדשה ביותר למעלה
+        let html = '';
+        ids.forEach(id => {
+            const items = sessions[id].slice().sort((a, b) => a.ts - b.ts);
+            html += '<div class="rep-session">📅 ' + escapeHtml(fmtDate(items[0].ts)) + ' — ' + escapeHtml(items[0].project || '') + '</div>';
+            items.forEach(r => { html += reportItemHtml(r); });
+        });
+        listEl.innerHTML = html;
+    }
+    function printReport() {
+        renderReport();
+        const area = document.getElementById('reportPrintArea');
+        area.innerHTML = '<h2>דוח משחק קריאה וכתיבה - נועם</h2><div style="margin-bottom:8px;">' + new Date().toLocaleDateString('he-IL') + '</div>' +
+            document.getElementById('reportSummary').innerHTML + document.getElementById('reportList').innerHTML;
+        document.body.classList.add('printing-report');
+        const done = () => { document.body.classList.remove('printing-report'); area.innerHTML = ''; window.removeEventListener('afterprint', done); };
+        window.addEventListener('afterprint', done);
+        setTimeout(() => window.print(), 50);
+        setTimeout(done, 120000);
+    }
+    function clearAllLog() {
+        openConfirmModal("ניקוי הדוח", "למחוק את כל הדוח ואת התמונות? אי אפשר לשחזר.", () => {
+            localStorage.removeItem(LOG_KEY);
+            localStorage.removeItem(IMG_KEY);
+            logCache = [];
+            imageStore = null;
+            renderReport();
+        });
+    }
+
+    // ================= [תיקון 31] ייצוא וייבוא (העברה בין מכשירים וגיבוי) =================
+    function downloadJson(obj, filename) {
+        const blob = new Blob([JSON.stringify(obj)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    }
+    function exportData(opts) {
+        if (!opts.projects && !opts.report) { alert("בחר מה לייצא."); return; }
+        const payload = { app: 'noam-reading-game', version: 1, exportedAt: new Date().toISOString() };
+        if (opts.projects) {
+            payload.projects = JSON.parse(localStorage.getItem('ninjagoData') || '{}');
+            payload.corrections = loadCorrectionsText();
+        }
+        if (opts.report) {
+            payload.log = loadLog();
+            payload.images = loadImages();
+        }
+        downloadJson(payload, 'noam-' + new Date().toISOString().slice(0, 10) + '.json');
+    }
+    function importData(text) {
+        let payload;
+        try { payload = JSON.parse(text); } catch (err) { alert("הקובץ לא תקין."); return; }
+        if (!payload || payload.app !== 'noam-reading-game') { alert("זה לא קובץ גיבוי של המשחק."); return; }
+        let addedProjects = 0, addedRecords = 0;
+
+        if (payload.projects && typeof payload.projects === 'object') {
+            const all = JSON.parse(localStorage.getItem('ninjagoData') || '{}');
+            Object.keys(payload.projects).forEach(name => {
+                const proj = payload.projects[name];
+                if (!proj || typeof proj !== 'object' || Array.isArray(proj)) return;
+                let newName = name, n = 2;
+                if (all[newName]) { // לא דורסים פרויקט קיים: מוסיפים אותו בשם חדש
+                    newName = name + ' (מיובא)';
+                    while (all[newName]) newName = name + ' (מיובא ' + (n++) + ')';
+                }
+                all[newName] = proj;
+                addedProjects++;
+            });
+            localStorage.setItem('ninjagoData', JSON.stringify(all));
+            if (typeof payload.corrections === 'string' && payload.corrections.trim()) {
+                const merged = loadCorrectionsText().split('\n').map(s => s.trim()).filter(Boolean);
+                payload.corrections.split('\n').map(s => s.trim()).filter(Boolean).forEach(l => { if (!merged.includes(l)) merged.push(l); });
+                localStorage.setItem(CORRECTIONS_KEY, merged.join('\n'));
+                document.getElementById('correctionsInput').value = merged.join('\n');
+            }
+        }
+
+        if (Array.isArray(payload.log)) {
+            const log = loadLog();
+            const ids = new Set(log.map(r => r.id));
+            payload.log.forEach(r => {
+                if (r && typeof r.id === 'string' && !ids.has(r.id) && Array.isArray(r.attempts)) { log.push(r); ids.add(r.id); addedRecords++; }
+            });
+            log.sort((a, b) => a.ts - b.ts);
+            persistLog();
+            if (payload.images && payload.images.map && typeof payload.images.map === 'object') {
+                const st = loadImages();
+                Object.keys(payload.images.map).forEach(id => {
+                    const url = payload.images.map[id];
+                    // מקבלים רק תמונות JPEG שהמשחק עצמו יצר
+                    if (typeof url === 'string' && url.indexOf('data:image/jpeg;base64,') === 0 && !st.map[id]) { st.map[id] = url; st.order.push(id); }
+                });
+                persistImages();
+            }
+        }
+
+        populateProjectsList();
+        renderReport();
+        alert("הייבוא הסתיים: נוספו " + addedProjects + " פרויקטים ו-" + addedRecords + " רשומות דוח.");
+    }
+    document.getElementById('importFile').addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => importData(reader.result);
+        reader.readAsText(f);
+        e.target.value = '';
+    });
+
     // [תיקון 2] כשהדף נטען: ממלאים את רשימת הפרויקטים ומנסים לטעון את הפרויקט האחרון.
     // (הטעינה בפועל תתבצע רק כשגם נגן היוטיוב מוכן.)
     window.addEventListener('orientationchange', () => { setTimeout(syncCanvasSize, 300); });
     window.onload = function() {
         domReady = true;
         document.getElementById('correctionsInput').value = loadCorrectionsText(); // [תיקון 20]
+        switchTab(localStorage.getItem('ninjagoTab') || 'project'); // [תיקון 22]
         populateProjectsList();
         tryRestoreLastProject();
     };
