@@ -305,6 +305,20 @@
             background: rgba(0,0,0,0.6); z-index: 9999;
             justify-content: center; align-items: center;
         }
+        /* [תיקון 32] סרגל התקדמות במשחק */
+        #progressTrack { position: relative; direction: ltr; height: 34px; margin: 0 6px 6px; }
+        #progressLine { position: absolute; left: 0; right: 0; top: 10px; height: 6px; border-radius: 3px; background: #cfd8dc; }
+        #progressDots { position: absolute; left: 0; right: 0; top: 0; height: 26px; }
+        .pdot { position: absolute; top: 5px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #b0bec5; border: 2px solid #fff; box-shadow: 0 0 0 1px #90a4ae; }
+        .pdot.done { background: #43a047; box-shadow: 0 0 0 1px #2e7d32; }
+        .pdot.cur { background: #ffb300; box-shadow: 0 0 0 3px #ff6f00; width: 20px; height: 20px; margin-left: -10px; top: 3px; z-index: 2; }
+        #progressCounts { position: absolute; left: 0; right: 0; top: 17px; text-align: center; font-size: 14px; color: #455a64; direction: rtl; }
+        /* [תיקון 32] סימון הורה בדוח */
+        .rep-actions { margin-top: 6px; display: flex; gap: 8px; }
+        .rep-actions button { padding: 4px 12px; font-size: 15px; border-radius: 6px; border: 1px solid #90a4ae; background: #fff; cursor: pointer; }
+        .rep-actions button.on-ok { background: #43a047; color: #fff; border-color: #2e7d32; }
+        .rep-actions button.on-bad { background: #e53935; color: #fff; border-color: #b71c1c; }
+        #reportPrintArea .rep-actions { display: none; }
         /* [תיקון 22] מסך עריכה בשתי עמודות עם לשוניות */
         #editLayout { display: flex; flex-direction: row-reverse; gap: 16px; align-items: flex-start; } /* [תיקון 31] וידאו משמאל, בקרה מימין */
         #editLeft { flex: 0 0 44%; position: sticky; top: 84px; }
@@ -456,7 +470,8 @@
             <div class="control-group" style="background-color: #e3f2fd;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3 style="margin: 0;">הפרויקטים שלי</h3>
-                    <button class="btn-nav" onclick="startNewProject()" style="background-color: #fff; border: 2px solid #ffb300;">➕ פרויקט חדש</button>
+                    <span><button class="btn-nav" onclick="duplicateProject()" style="background-color: #fff; border: 2px solid #90a4ae;">📄 שכפל</button>
+                    <button class="btn-nav" onclick="startNewProject()" style="background-color: #fff; border: 2px solid #ffb300;">➕ פרויקט חדש</button></span>
                 </div>
                 <select id="projectSelect" onchange="loadSelectedProject()" style="margin-top: 15px;">
                     <option value="">-- בחר פרויקט קיים --</option>
@@ -508,7 +523,9 @@
                         <div style="display:flex; gap:5px; margin-top:5px;">
                             <button class="btn-nav btn-small" onclick="shiftSrtTimes(-0.5)">הקדמה (-0.5 ש') ⏪</button>
                             <button class="btn-nav btn-small" onclick="shiftSrtTimes(0.5)">איחור (+0.5 ש') ⏩</button>
+                            <button class="btn-nav btn-small" onclick="resetSrtOffset()" style="background:#ffe0b2;">אפס ↺</button>
                         </div>
+                        <div id="srtOffsetDisplay" style="margin-top:6px; font-size:16px; font-weight:bold; color:#546e7a;">הזזה מצטברת: 0.0 ש'</div>
                     </div>
 
                     <!-- [תיקון 20] מילון תיקונים לתמלול -->
@@ -605,6 +622,7 @@
                     <h3 style="margin: 0 0 8px 0;">📋 דוח משחק</h3>
                     <div id="reportSummary" style="margin-bottom: 8px;"></div>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <button class="btn-action btn-small" id="practiceBtn" onclick="startMistakePractice()" style="background:#e53935;">🔁 תרגל טעויות</button>
                         <button class="btn-action btn-small" onclick="printReport()">🖨️ הדפס / שמור PDF</button>
                         <button class="btn-nav btn-small" onclick="exportData({projects: false, report: true})">📤 ייצא דוח</button>
                         <button class="btn-nav btn-small" onclick="document.getElementById('importFile').click()">📥 ייבא קובץ</button>
@@ -646,6 +664,8 @@
             <button class="btn-nav" id="btnReport" style="background-color:#ffe0b2; font-size:15px; padding:6px 12px; min-height:36px;">🚩 יש טעות</button>
             <div id="exitSlider"><div id="exitThumb">⚙️</div><span>גרור ימינה כדי לחזור לעריכה</span></div>
         </div>
+        <!-- [תיקון 32] סרגל התקדמות: מיקום התרגילים בסרטון, כמה הושלם וכמה נותר -->
+        <div id="progressTrack"><div id="progressLine"></div><div id="progressDots"></div><div id="progressCounts"></div></div>
         <!-- [תיקון 16] עמודת כפתורים בצד ימין והסרטון משמאל. המאזינים של הכפתורים מוגדרים בסקריפט -->
         <div id="gameTop">
             <div id="gameSide">
@@ -654,6 +674,7 @@
                 <button class="btn-nav game-btn hidden" id="btnToggleEraser" onclick="toggleEraser()">מחק 🧽</button>
                 <button class="btn-danger game-btn hidden" id="btnClearCanvas" onclick="clearBoard()">נקה לוח 🗑️</button>
                 <button class="btn-success game-btn" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
+                <button class="btn-action game-btn hidden" id="btnNextScene" onclick="nextScene()">המשך לסצנה הבאה ➡️</button>
                 <button class="btn-nav game-btn hidden" id="btnSkipPlay">⏭ דלג להמשך</button>
             </div>
             <div id="gameVideoPlaceholder"></div>
@@ -679,7 +700,6 @@
         <!-- [תיקון 12] מקלדת עברית קבועה בתוך הדף (בתרגיל הקלדה), במקום מקלדת האייפד. נבנית בסקריפט -->
         <div id="onScreenKeyboard" class="hidden"></div>
         
-        <button class="btn-action btn-large hidden" id="btnNextScene" onclick="nextScene()">המשך לסצנה הבאה ➡️</button>
     </div>
 </div>
 
@@ -700,6 +720,8 @@
     let ytPlayer = null;
     let ytReady = false;
     let globalRawSrtClips = []; 
+    let srtOffset = 0;      // [תיקון 32] הזזה מצטברת של הכתוביות ביחס לקובץ המקורי
+    let practiceList = null; // [תיקון 32] מצב תרגול טעויות: רשימת מזהי סצנות
     // [תיקון 3] טיימר ביטחון להשמעת משפט: אם הסרטון לא הגיע לסוף הקטע (למשל לא התחיל לנגן), השדה ישתחרר בכל זאת.
     let audioSafetyTimer = null;
 
@@ -793,6 +815,7 @@
         reader.onload = function(e) {
             const srtText = e.target.result.trim();
             globalRawSrtClips = extractRawClips(srtText);
+            srtOffset = 0; updateSrtOffsetDisplay();
             // [תיקון 20] מחילים את מילון התיקונים על הכתוביות החדשות
             const corrPairs = parseCorrections(loadCorrectionsText());
             globalRawSrtClips.forEach(c => { c.text = applyCorrectionsToText(c.text, corrPairs).text; });
@@ -833,9 +856,28 @@
     function shiftSrtTimes(amount) {
         if (!globalRawSrtClips || globalRawSrtClips.length === 0) { alert("אין קובץ כתוביות פעיל."); return; }
         globalRawSrtClips.forEach(c => { c.start += amount; c.end += amount; });
+        srtOffset = Math.round((srtOffset + amount) * 10) / 10;
+        updateSrtOffsetDisplay();
         saveData(); 
         autoPullText(tempStart, tempEnd); 
-        alert(`סנכרון בוצע: הזמנים תוקנו ב-${amount} שניות.`);
+        alert(`סנכרון בוצע: הזמנים תוקנו ב-${amount} שניות. סך ההזזה: ${srtOffset} ש'.`);
+    }
+    // [תיקון 32] מונה הזזה מצטברת + איפוס לזמנים המקוריים
+    function updateSrtOffsetDisplay() {
+        const el = document.getElementById('srtOffsetDisplay');
+        if (!el) return;
+        const v = Math.round(srtOffset * 10) / 10;
+        el.textContent = "הזזה מצטברת: " + (v > 0 ? '+' : '') + v.toFixed(1) + " ש'";
+        el.style.color = v === 0 ? '#546e7a' : '#e65100';
+    }
+    function resetSrtOffset() {
+        if (!globalRawSrtClips || globalRawSrtClips.length === 0) { alert("אין קובץ כתוביות פעיל."); return; }
+        if (srtOffset === 0) return;
+        globalRawSrtClips.forEach(c => { c.start -= srtOffset; c.end -= srtOffset; });
+        srtOffset = 0;
+        updateSrtOffsetDisplay();
+        saveData();
+        autoPullText(tempStart, tempEnd);
     }
 
     function autoPullText(tStart, tEnd) {
@@ -898,6 +940,7 @@
         tempStart = 0;
         tempEnd = 0;
         globalRawSrtClips = [];
+        srtOffset = 0; updateSrtOffsetDisplay();
 
         // [תיקון 2] מצב "פרויקט חדש" או ריק: אין פרויקט אחרון לזכור.
         // (ברגע שיישמר פרויקט חדש, saveData תרשום אותו מחדש.)
@@ -955,6 +998,7 @@
             currentVideoId = selected;
             currentProjectName = selected;
             globalRawSrtClips = [];
+            srtOffset = 0;
             document.getElementById('chkBlockSubtitles').checked = true;
             document.getElementById('chkFullPlay').checked = false;
         } else {
@@ -962,6 +1006,7 @@
             currentVideoId = projData.videoId;
             currentProjectName = selected;
             globalRawSrtClips = projData.srtClips || []; 
+            srtOffset = projData.srtOffset || 0;
             document.getElementById('chkBlockSubtitles').checked = projData.blockSubtitles !== false;
             document.getElementById('chkFullPlay').checked = projData.fullPlay === true;
         }
@@ -993,6 +1038,7 @@
                 });
             }
         }
+        updateSrtOffsetDisplay();
         renderScenes();
     }
 
@@ -1027,9 +1073,10 @@
         if (allData[currentProjectName] && !Array.isArray(allData[currentProjectName])) {
              scenes = allData[currentProjectName].scenes || [];
              globalRawSrtClips = allData[currentProjectName].srtClips || [];
+             srtOffset = allData[currentProjectName].srtOffset || 0; updateSrtOffsetDisplay();
              document.getElementById('chkBlockSubtitles').checked = allData[currentProjectName].blockSubtitles !== false;
              document.getElementById('chkFullPlay').checked = allData[currentProjectName].fullPlay === true;
-        } else { scenes = []; globalRawSrtClips = []; document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; }
+        } else { scenes = []; globalRawSrtClips = []; srtOffset = 0; updateSrtOffsetDisplay(); document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; }
         
         saveData();
     }
@@ -1217,12 +1264,17 @@
         if (!projName || !currentVideoId) { return; }
 
         let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
+        // [תיקון 32] שינוי שם לשם של פרויקט אחר: שואלים לפני שדורסים
+        if (currentProjectName && currentProjectName !== projName && allData[projName]) {
+            if (!confirm('כבר קיים פרויקט בשם "' + projName + '". להחליף אותו?')) { document.getElementById('projectNameInput').value = currentProjectName; return; }
+        }
         scenes.sort((a, b) => a.start - b.start);
         
         allData[projName] = { 
             videoId: currentVideoId, 
             scenes: scenes,
             srtClips: globalRawSrtClips,
+            srtOffset: srtOffset,
             blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
             fullPlay: document.getElementById('chkFullPlay').checked
         };
@@ -1244,6 +1296,7 @@
             videoId: currentVideoId, 
             scenes: scenes, 
             srtClips: globalRawSrtClips,
+            srtOffset: srtOffset,
             blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
             fullPlay: document.getElementById('chkFullPlay').checked
         };
@@ -1375,10 +1428,11 @@
     }
 
     function toggleMode() {
+        if (currentMode === 'game') practiceList = null; // [תיקון 32] יוצאים ממצב תרגול טעויות
         if (currentMode === 'edit') {
-            if (scenes.filter(s => s.show).length === 0) { alert("אין סצנות פעילות למשחק פרויקט זה."); return; }
+            if (getActiveScenes().length === 0) { alert("אין סצנות פעילות למשחק פרויקט זה."); return; }
             currentMode = 'game';
-            fullPlayMode = document.getElementById('chkFullPlay').checked; // [תיקון 19]
+            fullPlayMode = document.getElementById('chkFullPlay').checked && !practiceList; // [תיקון 19]
             currentSession = { id: Date.now() };  // [תיקון 25] הפעלה חדשה בדוח
             practice = null;
             
@@ -1421,10 +1475,14 @@
         }
     }
 
-    function getActiveScenes() { return scenes.filter(s => s.show).sort((a,b) => a.start - b.start); }
+    function getActiveScenes() {
+        if (practiceList) return scenes.filter(s => practiceList.includes(s.id)).sort((a,b) => a.start - b.start); // [תיקון 32] תרגול טעויות
+        return scenes.filter(s => s.show).sort((a,b) => a.start - b.start);
+    }
 
     // [תיקון 28] כניסה למשחק: אם יש התקדמות שמורה, שואלים אם להמשיך או להתחיל מההתחלה
     function startGame() {
+        if (practiceList) { beginGameAt(0); return; } // [תיקון 32] בתרגול טעויות לא שואלים על המשך
         const list = getActiveScenes();
         const prog = getProgress();
         let idx = -1;
@@ -1540,6 +1598,7 @@
 
         const scene = activeScenes[currentGameIndex];
         document.getElementById('gameProgress').innerText = `סצנה ${currentGameIndex + 1} מתוך ${activeScenes.length}`;
+        renderProgressTrack();
         saveProgress(currentGameIndex, scene.id); // [תיקון 28] זוכרים איפה הילד נמצא
         
         setPlayingVideoUI(false); // [תיקון 19] חוזרים ממסך "הסרטון מתנגן" למסך התרגיל
@@ -2164,6 +2223,7 @@
         const scene = getActiveScenes()[currentGameIndex];
         if (!scene || (currentTaskType() !== 'typing' && currentTaskType() !== 'freewrite')) return;
         const box = document.getElementById('hintBox');
+        if (!box.classList.contains('hidden')) { hideHint(); return; } // [תיקון 32] לחיצה שנייה מסתירה
         box.textContent = scene.text;
         box.classList.remove('hidden');
         if (hintTimer) clearTimeout(hintTimer);
@@ -2187,7 +2247,7 @@
         const kids = Array.from(side.children).filter(c => !c.classList.contains('hidden'));
         const sideH = kids.reduce((a, c) => a + c.offsetHeight, 0) + 6 * Math.max(0, kids.length - 1);
         const maxW = Math.max(200, document.getElementById('gameTop').clientWidth - 190 - 12);
-        const headerH = document.getElementById('gameHeader').offsetHeight + 6;
+        const headerH = document.getElementById('gameHeader').offsetHeight + 6 + (document.getElementById('progressTrack').offsetHeight + 6);
         const selfPanel = document.getElementById('selfCheckPanel');
         const selfH = selfPanel.classList.contains('hidden') ? 0 : selfPanel.offsetHeight + 6;
         const avail = vh - 28 - 8 - 6 - 6 - areaH - kbTotal - headerH - selfH;
@@ -2569,12 +2629,13 @@
     }
     function getProgress() { return loadProgressAll()[currentProjectName] || null; }
     function saveProgress(index, sceneId) {
-        if (!currentProjectName) return;
+        if (!currentProjectName || practiceList) return;
         const all = loadProgressAll();
         all[currentProjectName] = { index: index, sceneId: sceneId, ts: Date.now() };
         try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(all)); } catch (e) {}
     }
     function clearProgress() {
+        if (practiceList) return;
         const all = loadProgressAll();
         delete all[currentProjectName];
         try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(all)); } catch (e) {}
@@ -2670,6 +2731,10 @@
         return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
     }
     function badgeFor(r) {
+        // [תיקון 32] הסימון של ההורה קובע; הסימון של הילד בכתיבה חופשית לא מוצג
+        if (r.parent === 'ok') return { k: 'good', label: '✔ נכון' };
+        if (r.parent === 'bad') return { k: 'bad', label: '✘ לא נכון' + (r.retried ? ' (תורגל שוב)' : '') };
+        if (r.result === 'self-correct' || r.result === 'self-wrong') return { k: 'none', label: '⏳ ממתין לבדיקה שלך' };
         switch (r.result) {
             case 'correct': return { k: 'good', label: '✔ נכון' };
             case 'self-correct': return { k: 'good', label: '✔ הילד סימן: כתבתי נכון' };
@@ -2689,9 +2754,41 @@
         if (r.reportText) h += '<div class="rep-attempt">🚩 הילד הציע: "' + escapeHtml(r.reportText) + '"</div>';
         const img = r.img ? getImage(r.img) : null;
         if (img) h += '<img class="rep-img" src="' + img + '" alt="">';
+        h += '<div class="rep-actions"><button class="' + (r.parent === 'ok' ? 'on-ok' : '') + '" onclick="markRecord(\'' + r.id + '\',\'ok\')">✔ נכון</button><button class="' + (r.parent === 'bad' ? 'on-bad' : '') + '" onclick="markRecord(\'' + r.id + '\',\'bad\')">✘ לא נכון</button></div>';
         return h + '</div>';
     }
+    // [תיקון 32] סימון ההורה בדוח, ותרגול של התרגילים שסומנו כלא נכונים
+    function markRecord(id, val) {
+        const log = loadLog();
+        const r = log.find(x => x.id === id);
+        if (!r) return;
+        if (r.parent === val) delete r.parent; else { r.parent = val; delete r.retried; }
+        persistLog();
+        const y = window.scrollY;
+        renderReport();
+        window.scrollTo(0, y);
+    }
+    function mistakeRecords() {
+        return loadLog().filter(r => r.parent === 'bad' && !r.retried && r.project === currentProjectName);
+    }
+    function updatePracticeBtn() {
+        const b = document.getElementById('practiceBtn');
+        if (!b) return;
+        const n = new Set(mistakeRecords().map(r => r.sceneId)).size;
+        b.textContent = '🔁 תרגל טעויות' + (n ? ' (' + n + ')' : '');
+    }
+    function startMistakePractice() {
+        if (!currentProjectName) { alert("פתח קודם את הפרויקט שעליו מדובר."); return; }
+        const recs = mistakeRecords();
+        const ids = Array.from(new Set(recs.map(r => r.sceneId))).filter(id => scenes.some(s => s.id === id));
+        if (ids.length === 0) { alert("אין תרגילים שסומנו כלא נכונים בפרויקט הזה."); return; }
+        recs.forEach(r => { r.retried = true; });
+        persistLog();
+        practiceList = ids;
+        toggleMode();
+    }
     function renderReport() {
+        updatePracticeBtn();
         const listEl = document.getElementById('reportList');
         const sumEl = document.getElementById('reportSummary');
         if (!listEl) return;
@@ -2819,6 +2916,48 @@
         reader.readAsText(f);
         e.target.value = '';
     });
+
+    // ================= [תיקון 32] סרגל התקדמות במשחק =================
+    function renderProgressTrack() {
+        const list = getActiveScenes();
+        const dots = document.getElementById('progressDots');
+        if (!dots) return;
+        let dur = getVideoDuration();
+        const lastEnd = list.length ? Math.max.apply(null, list.map(s => s.end)) : 0;
+        if (!dur || dur < lastEnd) dur = lastEnd * 1.05 || 1;
+        dots.innerHTML = '';
+        list.forEach((s, i) => {
+            const d = document.createElement('div');
+            d.className = 'pdot' + (i < currentGameIndex ? ' done' : (i === currentGameIndex ? ' cur' : ''));
+            d.style.left = Math.max(1, Math.min(99, s.start / dur * 100)) + '%';
+            dots.appendChild(d);
+        });
+        const done = Math.min(currentGameIndex, list.length);
+        document.getElementById('progressCounts').textContent = 'הושלמו ' + done + ' · נותרו ' + (list.length - done);
+    }
+
+    // ================= [תיקון 32] שכפול פרויקט: אותו סרטון ואותן כתוביות, בלי סצנות =================
+    function duplicateProject() {
+        if (!currentProjectName || !currentVideoId) { alert("פתח קודם פרויקט כדי לשכפל אותו."); return; }
+        const allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
+        const src = allData[currentProjectName];
+        if (!src || Array.isArray(src)) { alert("שמור קודם את הפרויקט."); return; }
+        const name = (prompt("שם לפרויקט החדש:", currentProjectName + " 2") || '').trim();
+        if (!name) return;
+        if (allData[name]) { alert("כבר קיים פרויקט בשם הזה. בחר שם אחר."); return; }
+        allData[name] = {
+            videoId: src.videoId,
+            scenes: [],
+            srtClips: JSON.parse(JSON.stringify(src.srtClips || [])),
+            srtOffset: src.srtOffset || 0,
+            blockSubtitles: src.blockSubtitles !== false,
+            fullPlay: src.fullPlay === true
+        };
+        localStorage.setItem('ninjagoData', JSON.stringify(allData));
+        populateProjectsList();
+        document.getElementById('projectSelect').value = name;
+        loadSelectedProject();
+    }
 
     // [תיקון 2] כשהדף נטען: ממלאים את רשימת הפרויקטים ומנסים לטעון את הפרויקט האחרון.
     // (הטעינה בפועל תתבצע רק כשגם נגן היוטיוב מוכן.)
