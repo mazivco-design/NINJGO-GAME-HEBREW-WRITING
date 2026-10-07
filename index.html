@@ -48,7 +48,9 @@
         }
         
         #app-container.game-mode { max-width: 100%; padding: 8px 12px; }
-        body.game-active { padding: 6px; }
+        body.game-active { padding: 6px; overflow-x: hidden; overscroll-behavior-x: none; }
+        html:has(body.game-active) { overflow-x: hidden; overscroll-behavior-x: none; }
+        #app-container.game-mode { overflow-x: hidden; max-width: 100vw; }
         /* [תיקון 16] במשחק אין שורת כותרת עליונה: יותר מקום לסרטון ולכתיבה (כפתור היציאה נמצא בעמודת הכפתורים) */
         .game-mode .top-nav { display: none; }
 
@@ -304,7 +306,7 @@
             justify-content: center; align-items: center;
         }
         /* [תיקון 22] מסך עריכה בשתי עמודות עם לשוניות */
-        #editLayout { display: flex; gap: 16px; align-items: flex-start; }
+        #editLayout { display: flex; flex-direction: row-reverse; gap: 16px; align-items: flex-start; } /* [תיקון 31] וידאו משמאל, בקרה מימין */
         #editLeft { flex: 0 0 44%; position: sticky; top: 84px; }
         #editRight { flex: 1; min-width: 0; }
         #editTabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -641,6 +643,7 @@
         <!-- [תיקון 23] שורת כותרת: התקדמות מימין, כפתור גרירה לחזרה לעריכה משמאל -->
         <div id="gameHeader">
             <div class="progress-bar" id="gameProgress">סצנה 1 מתוך 5</div>
+            <button class="btn-nav" id="btnReport" style="background-color:#ffe0b2; font-size:15px; padding:6px 12px; min-height:36px;">🚩 יש טעות</button>
             <div id="exitSlider"><div id="exitThumb">⚙️</div><span>גרור ימינה כדי לחזור לעריכה</span></div>
         </div>
         <!-- [תיקון 16] עמודת כפתורים בצד ימין והסרטון משמאל. המאזינים של הכפתורים מוגדרים בסקריפט -->
@@ -651,7 +654,6 @@
                 <button class="btn-nav game-btn hidden" id="btnToggleEraser" onclick="toggleEraser()">מחק 🧽</button>
                 <button class="btn-danger game-btn hidden" id="btnClearCanvas" onclick="clearBoard()">נקה לוח 🗑️</button>
                 <button class="btn-success game-btn" id="btnDoneWriting" onclick="checkTask()">סיימתי! 🎬</button>
-                <button class="btn-nav game-btn" id="btnReport" style="background-color:#ffe0b2;">🚩 יש טעות</button>
                 <button class="btn-nav game-btn hidden" id="btnSkipPlay">⏭ דלג להמשך</button>
             </div>
             <div id="gameVideoPlaceholder"></div>
@@ -1596,7 +1598,7 @@
             typedEl.classList.add('hidden');
             clearBtn.classList.remove('hidden');
             eraserBtn.classList.remove('hidden');
-            hintBtn.classList.add('hidden');
+            hintBtn.classList.remove('hidden');      // [תיקון 31] רמז גם בכתיבה חופשית
             keyboardEl.classList.add('hidden');
             appContainer.classList.remove('typing-task');
             areaEl.classList.remove('tracing-mode');
@@ -2160,7 +2162,7 @@
     }
     function showHint() {
         const scene = getActiveScenes()[currentGameIndex];
-        if (!scene || currentTaskType() !== 'typing') return;
+        if (!scene || (currentTaskType() !== 'typing' && currentTaskType() !== 'freewrite')) return;
         const box = document.getElementById('hintBox');
         box.textContent = scene.text;
         box.classList.remove('hidden');
@@ -2231,11 +2233,11 @@
         }
         saveSettingsIfProject();
         if (currentRecord) { // [תיקון 25] נרשם בדוח
-            currentRecord.result = 'reported';
+            currentRecord.reported = true;
             if (withText && typedText.trim()) currentRecord.reportText = typedText.trim();
             saveRecord();
         }
-        rewardAndPlayFullVideo(); // הילד לא נתקע: ממשיכים לסרטון ולסצנה הבאה
+        showGameMessage("תודה! 🚩", "הדיווח נשלח להורה. ממשיכים בתרגיל."); // [תיקון 31] רק נרשם, לא מדלגים
     }
     function clearReport(s) { s.reportCount = 0; s.suggestions = []; }
     function adoptSuggestion(id, idx) {
@@ -2679,7 +2681,7 @@
     function reportItemHtml(r) {
         const b = badgeFor(r);
         const attempts = r.attempts || [];
-        let h = '<div class="rep-item"><div><span class="rep-expected">' + escapeHtml(r.expected) + '</span><span class="rep-badge rep-' + b.k + '">' + b.label + '</span></div>';
+        let h = '<div class="rep-item"><div><span class="rep-expected">' + escapeHtml(r.expected) + '</span><span class="rep-badge rep-' + b.k + '">' + b.label + '</span>' + (r.reported && r.result !== 'reported' ? '<span class="rep-badge rep-flag">🚩 דווח על טעות</span>' : '') + '</div>';
         h += '<div style="font-size:14px;color:#607d8b;">' + (TYPE_LABEL[r.type] || '') + (attempts.length ? ' · ניסיונות: ' + attempts.length : '') + (r.hints ? ' · 💡 רמזים: ' + r.hints : '') + '</div>';
         attempts.forEach(a => {
             if (a.typed !== undefined) h += '<div class="rep-attempt">' + (a.ok ? '✔' : '✘') + ' הילד כתב: "' + escapeHtml(a.typed) + '"</div>';
