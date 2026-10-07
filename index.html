@@ -112,10 +112,10 @@
         
         #subtitleBlocker {
             position: absolute;
-            bottom: 45px; 
+            bottom: 0; /* [תיקון 33] עד תחתית הסרטון */
             left: 0;
             width: 100%;
-            height: 18%; 
+            height: calc(18% + 45px); 
             background-color: #000;
             z-index: 5;
             display: none; /* נשלט כעת דרך JS לפי הצ'קבוקס */
@@ -125,7 +125,7 @@
         #audioOnlyOverlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: #000; /* [תיקון 33] אטום לגמרי */
             color: white;
             display: flex;
             align-items: center;
@@ -312,13 +312,28 @@
         .pdot { position: absolute; top: 5px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #b0bec5; border: 2px solid #fff; box-shadow: 0 0 0 1px #90a4ae; }
         .pdot.done { background: #43a047; box-shadow: 0 0 0 1px #2e7d32; }
         .pdot.cur { background: #ffb300; box-shadow: 0 0 0 3px #ff6f00; width: 20px; height: 20px; margin-left: -10px; top: 3px; z-index: 2; }
-        #progressCounts { position: absolute; left: 0; right: 0; top: 17px; text-align: center; font-size: 14px; color: #455a64; direction: rtl; }
+        #progressFill { height: 100%; width: 0; border-radius: 3px; background: #66bb6a; }
+        #progressLine::before, #progressLine::after { content: ''; position: absolute; top: -4px; width: 3px; height: 14px; background: #37474f; border-radius: 2px; }
+        #progressLine::before { left: 0; } #progressLine::after { right: 0; }
+        #progressCounts { position: absolute; left: 0; right: 0; top: 17px; display: flex; justify-content: space-between; font-size: 14px; color: #455a64; direction: ltr; }
+        #progMid { direction: rtl; font-weight: bold; }
         /* [תיקון 32] סימון הורה בדוח */
         .rep-actions { margin-top: 6px; display: flex; gap: 8px; }
         .rep-actions button { padding: 4px 12px; font-size: 15px; border-radius: 6px; border: 1px solid #90a4ae; background: #fff; cursor: pointer; }
         .rep-actions button.on-ok { background: #43a047; color: #fff; border-color: #2e7d32; }
         .rep-actions button.on-bad { background: #e53935; color: #fff; border-color: #b71c1c; }
         #reportPrintArea .rep-actions { display: none; }
+        /* [תיקון 33] פס גרירה לסרטון ורשימת כל הכתוביות */
+        #seekBarRow { display: flex; align-items: center; gap: 8px; direction: ltr; margin: 6px 0 8px; }
+        #seekBar { flex: 1; height: 30px; }
+        #seekCur, #seekTotal { font-size: 15px; font-weight: bold; min-width: 44px; text-align: center; color: #455a64; }
+        #allSubsList { max-height: 50vh; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+        .sub-row { padding: 6px 10px; border-bottom: 1px solid #eee; font-size: 18px; line-height: 1.7; }
+        .sub-time { display: inline-block; min-width: 54px; font-size: 13px; color: #fff; background: #607d8b; border-radius: 8px; padding: 0 6px; margin-left: 8px; cursor: pointer; text-align: center; direction: ltr; }
+        .sub-word { cursor: pointer; padding: 1px 2px; border-radius: 4px; }
+        .sub-word:active { background: #ffe082; }
+        .ag-grid { display: grid; grid-template-columns: 1fr 120px; gap: 8px 12px; align-items: center; }
+        .ag-grid input[type=number], .ag-grid select { padding: 6px; font-size: 16px; }
         /* [תיקון 22] מסך עריכה בשתי עמודות עם לשוניות */
         #editLayout { display: flex; flex-direction: row-reverse; gap: 16px; align-items: flex-start; } /* [תיקון 31] וידאו משמאל, בקרה מימין */
         #editLeft { flex: 0 0 44%; position: sticky; top: 84px; }
@@ -455,6 +470,8 @@
                     <div id="subtitleBlocker"></div> 
                 </div>
             </div>
+            <!-- [תיקון 33] פס גרירה משלנו (פקדי יוטיוב הוסרו כדי שלא יסתירו את הכתוביות) -->
+            <div id="seekBarRow"><span id="seekCur">0:00</span><input type="range" id="seekBar" min="0" max="1000" value="0"><span id="seekTotal">0:00</span></div>
             
             <!-- תצוגת כתוביות חיה למסנכרן -->
             <div id="liveSubtitleDisplay">-- תצוגת כתוביות חיה תופיע כאן --</div>
@@ -481,6 +498,7 @@
             <div id="editTabs">
                 <button class="tab-btn active" data-tab="project" onclick="switchTab('project')">📁 פרויקט</button>
                 <button class="tab-btn" data-tab="subtitles" onclick="switchTab('subtitles')">📝 כתוביות</button>
+                <button class="tab-btn" data-tab="autogen" onclick="switchTab('autogen')">🤖 יצירה אוטומטית</button>
                 <button class="tab-btn" data-tab="manual" onclick="switchTab('manual')">✂️ סצנה ידנית</button>
                 <button class="tab-btn" data-tab="scenes" onclick="switchTab('scenes')">🎬 סצנות</button>
                 <button class="tab-btn" data-tab="report" onclick="switchTab('report')">📋 דוח</button>
@@ -536,6 +554,35 @@
                         <button class="btn-action btn-small" style="margin-top: 8px;" onclick="saveAndApplyCorrections()">שמור והחל על הסצנות והכתוביות 🔧</button>
                     </details>
 
+                    <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות מכל הקובץ ⚡</button>
+                </div>
+                <!-- [תיקון 33] כל הכתוביות: לחיצה על מילה מתקנת אותה במשפט הזה בלבד -->
+                <div class="control-group">
+                    <h3 style="margin-top:0;">📜 כל הכתוביות</h3>
+                    <p style="font-size:14px; margin:0 0 8px;">לחץ על מילה כדי לתקן אותה (התיקון חל רק במשפט הזה). לחץ על הזמן כדי לקפוץ אליו בסרטון. לתיקון בכל הקובץ השתמש במילון התיקונים.</p>
+                    <div id="allSubsList"><div style="padding:10px;color:#78909c;">טען קובץ כתוביות כדי לראות אותן כאן.</div></div>
+                </div>
+            </div>
+
+            <!-- ===== לשונית: יצירה אוטומטית ===== -->
+            <div id="tab-autogen" class="tab-pane">
+                <div class="control-group" style="border: 2px solid #673ab7;">
+                    <h3 style="color:#673ab7; margin-top:0;">🤖 הגדרות יצירת סצנות אוטומטית</h3>
+                    <div class="ag-grid">
+                        <label for="agMinWords">מינימום מילים במשפט</label><input type="number" id="agMinWords" min="1" max="30" step="1">
+                        <label for="agMaxWords">מקסימום מילים במשפט</label><input type="number" id="agMaxWords" min="1" max="30" step="1">
+                        <label for="agMinSec">אורך מינימלי (שניות)</label><input type="number" id="agMinSec" min="0" max="30" step="0.5">
+                        <label for="agMaxSec">אורך מקסימלי (שניות)</label><input type="number" id="agMaxSec" min="1" max="60" step="0.5">
+                        <label for="agPadStart">ריווח לפני המשפט (שניות)</label><input type="number" id="agPadStart" min="0" max="2" step="0.05">
+                        <label for="agPadEnd">ריווח אחרי המשפט (שניות)</label><input type="number" id="agPadEnd" min="0" max="2" step="0.05">
+                        <label for="agMaxGap">שקט שנחשב סוף דיבור (שניות)</label><input type="number" id="agMaxGap" min="0" max="10" step="0.1">
+                        <label for="agJoin">לחבר שורות עד סימן פיסוק</label><input type="checkbox" id="agJoin" style="width:28px;height:28px;">
+                        <label for="agType">סוג תרגיל לסצנות חדשות</label>
+                        <select id="agType"><option value="typing">⌨️ הקלדה</option><option value="tracing">✏️ טרייסינג</option><option value="freewrite">✍️ כתיבה חופשית</option></select>
+                        <label for="agShow">סצנות חדשות יהיו</label>
+                        <select id="agShow"><option value="off">כבויות (לבחירה שלי)</option><option value="on">פעילות</option></select>
+                    </div>
+                    <button class="btn-nav btn-small" style="margin-top:10px;" onclick="resetAutogen()">↺ החזר לברירות המחדל</button>
                     <button class="btn-action btn-large" style="background-color: #673ab7;" onclick="parseSRT()">חתוך וייצר סצנות מכל הקובץ ⚡</button>
                 </div>
             </div>
@@ -665,7 +712,7 @@
             <div id="exitSlider"><div id="exitThumb">⚙️</div><span>גרור ימינה כדי לחזור לעריכה</span></div>
         </div>
         <!-- [תיקון 32] סרגל התקדמות: מיקום התרגילים בסרטון, כמה הושלם וכמה נותר -->
-        <div id="progressTrack"><div id="progressLine"></div><div id="progressDots"></div><div id="progressCounts"></div></div>
+        <div id="progressTrack"><div id="progressLine"><div id="progressFill"></div></div><div id="progressDots"></div><div id="progressCounts"><span id="progStart"></span><span id="progMid"></span><span id="progEnd"></span></div></div>
         <!-- [תיקון 16] עמודת כפתורים בצד ימין והסרטון משמאל. המאזינים של הכפתורים מוגדרים בסקריפט -->
         <div id="gameTop">
             <div id="gameSide">
@@ -1033,7 +1080,7 @@
             else if (ytReady) {
                 ytPlayer = new YT.Player('youtubePlayer', {
                     videoId: vid,
-                    playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 },
+                    playerVars: { 'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'modestbranding': 1, 'rel': 0, 'iv_load_policy': 3 },
                     events: { 'onStateChange': onPlayerStateChange }
                 });
             }
@@ -1064,7 +1111,7 @@
             else if (ytReady) {
                 ytPlayer = new YT.Player('youtubePlayer', {
                     videoId: vid,
-                    playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding': 1, 'rel': 0 }
+                    playerVars: { 'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'modestbranding': 1, 'rel': 0, 'iv_load_policy': 3 }
                 });
             }
         }
@@ -1153,14 +1200,17 @@
         if (globalRawSrtClips.length === 0) { alert("אנא בחר קובץ SRT קודם."); return; }
 
         // אפשר לשנות את המספרים האלה כדי לקבל יותר או פחות סצנות:
-        const MIN_WORDS = 3;    // מינימום מילים במשפט
-        const MAX_WORDS = 8;    // מקסימום מילים במשפט
-        const MAX_SECONDS = 6;  // מקסימום אורך קטע בשניות (לפני הריווח)
-        const MAX_GAP = 1.5;    // שקט ארוך מזה (בשניות) נחשב סוף דיבור, ולא מחברים שורות מעבר אליו
-        const PAD_START = 0.3;  // [תיקון 17] כמה שניות להוסיף לפני המשפט (לכל היותר)
-        const PAD_END = 0.12;   // [תיקון 17] כמה שניות להוסיף אחרי המשפט (לכל היותר). קטן, כדי שהקטע לא יגלוש למילים הבאות
+        // [תיקון 33] ההגדרות נקבעות בלשונית "יצירה אוטומטית"
+        const AG = getAutogenSettings();
+        const MIN_WORDS = AG.minWords;
+        const MAX_WORDS = AG.maxWords;
+        const MAX_SECONDS = AG.maxSec;
+        const MIN_SECONDS = AG.minSec;
+        const MAX_GAP = AG.maxGap;
+        const PAD_START = AG.padStart;
+        const PAD_END = AG.padEnd;
 
-        const taskType = document.querySelector('input[name="taskType"]:checked').value;
+        const taskType = AG.type;
         const tracing = (taskType === 'tracing');
 
         // שלב 1: מחברים שורות ליחידות, עד סימן סיום משפט
@@ -1173,6 +1223,11 @@
                 buf.complete = false;   // נקטע באמצע (שקט ארוך): לא משפט שלם
                 units.push(buf);
                 buf = null;
+            }
+            if (!AG.join) { // [תיקון 33] בלי חיבור שורות: כל שורה בכתוביות היא יחידה בפני עצמה
+                units.push({ start: clip.start, end: clip.end, text: text, complete: true });
+                buf = null;
+                return;
             }
             if (!buf) {
                 buf = { start: clip.start, end: clip.end, text: text, complete: false };
@@ -1197,6 +1252,7 @@
             const words = u.text.split(/\s+/).filter(Boolean).length;
             if (words < MIN_WORDS || words > MAX_WORDS) return false;
             if (u.end - u.start > MAX_SECONDS) return false;
+            if (u.end - u.start < MIN_SECONDS) return false;
             if (/[.!?]["'”’)]*\s+\S/.test(u.text)) return false; // כמה משפטים באותו קטע: אי אפשר להפריד ביניהם
             return true;
         };
@@ -1218,7 +1274,7 @@
 
             scenes.push({
                 id: Date.now() + Math.random() + i,
-                start: s, end: e, text: u.text, type: taskType, tracing: tracing, show: false
+                start: s, end: e, text: u.text, type: taskType, tracing: tracing, show: AG.show
             });
             created++;
         });
@@ -1228,7 +1284,7 @@
             saveData();
             alert("נוצרו " + created + " סצנות מוצעות (כולן כבויות כרגע). דילגתי על " + skipped + " קטעים שלא מתאימים (קצרים, ארוכים או לא ברורים). סמן במשחק רק את אלה שאתה רוצה.");
         } else {
-            alert("לא נמצאו משפטים מתאימים (3 עד 8 מילים, עם סימן סיום). אפשר לשנות את ההגדרות בראש הפונקציה parseSRT.");
+            alert("לא נמצאו משפטים מתאימים (" + MIN_WORDS + " עד " + MAX_WORDS + " מילים, עם סימן סיום). אפשר לשנות את ההגדרות בלשונית \"יצירה אוטומטית\".");
         }
     }
 
@@ -1318,6 +1374,9 @@
         document.getElementById({ typing: 'typeTyping', tracing: 'typeTracing', freewrite: 'typeFree' }[sceneType(s)]).checked = true;
         document.getElementById('chkShowInGame').checked = s.show;
         document.getElementById('editSceneId').value = s.id;
+        switchTab('manual'); // [תיקון 33] עוברים ישר למסך העריכה
+        const tabsEl = document.getElementById('editTabs');
+        if (tabsEl && tabsEl.scrollIntoView) tabsEl.scrollIntoView({ block: 'start' });
     }
 
     // [תיקון 1] מחיקת סצנה בודדת.
@@ -1501,6 +1560,7 @@
     }
     function beginGameAt(idx) {
         currentGameIndex = idx;
+        progMax = 0;
         if (fullPlayMode && idx === 0) {
             startFullPlayIntro();
         } else if (fullPlayMode) {
@@ -1592,7 +1652,10 @@
             setPlayingVideoUI(false);
             hideSelfCheck();
             clearProgress(); // [תיקון 28] סיימנו את כל הסצנות: מתחילים מההתחלה בפעם הבאה
-            showGameMessage("כל הכבוד נועם! 🎉", "סיימת את כל הסצנות!", () => toggleMode());
+            showChoice("כל הכבוד נועם! 🎉", "סיימת את כל הסצנות!", [
+                { label: "↺ לשחק שוב מההתחלה", cls: "btn-success", fn: () => beginGameAt(0) },
+                { label: "⚙️ חזרה למצב עריכה", cls: "btn-nav", fn: () => toggleMode() }
+            ]); // [תיקון 33] מסך סיום, בלי חזרה אוטומטית לעריכה
             return;
         }
 
@@ -2706,6 +2769,7 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
         try { localStorage.setItem('ninjagoTab', name); } catch (e) {}
         if (name === 'report') renderReport();
+        if (name === 'subtitles') renderAllSubtitles();
     }
 
     // ================= [תיקון 30] קו הכתיבה בהקלדה צמוד לשורת הבסיס האמיתית של האותיות =================
@@ -2918,6 +2982,13 @@
     });
 
     // ================= [תיקון 32] סרגל התקדמות במשחק =================
+    let progDur = 0, progMax = 0;
+    setInterval(() => { // מילוי הסרגל לפי מה שכבר נוגן בסרטון
+        if (currentMode !== 'game' || !progDur) return;
+        const tt = getCurrentTime();
+        if (tt > progMax) progMax = tt;
+        document.getElementById('progressFill').style.width = Math.min(100, progMax / progDur * 100) + '%';
+    }, 250);
     function renderProgressTrack() {
         const list = getActiveScenes();
         const dots = document.getElementById('progressDots');
@@ -2933,7 +3004,10 @@
             dots.appendChild(d);
         });
         const done = Math.min(currentGameIndex, list.length);
-        document.getElementById('progressCounts').textContent = 'הושלמו ' + done + ' · נותרו ' + (list.length - done);
+        document.getElementById('progMid').textContent = 'הושלמו ' + done + ' · נותרו ' + (list.length - done);
+        document.getElementById('progStart').textContent = '▶ התחלה 0:00';
+        document.getElementById('progEnd').textContent = 'סוף ' + formatTime(dur) + ' 🏁';
+        progDur = dur;
     }
 
     // ================= [תיקון 32] שכפול פרויקט: אותו סרטון ואותן כתוביות, בלי סצנות =================
@@ -2958,6 +3032,128 @@
         document.getElementById('projectSelect').value = name;
         loadSelectedProject();
     }
+
+    // ================= [תיקון 33] פס גרירה משלנו לסרטון =================
+    (function initSeekBar() {
+        const bar = document.getElementById('seekBar');
+        const cur = document.getElementById('seekCur');
+        const tot = document.getElementById('seekTotal');
+        let dragging = false, lastSeek = 0;
+        bar.addEventListener('input', () => {
+            dragging = true;
+            const dur = getVideoDuration();
+            const tt = dur * bar.value / 1000;
+            cur.textContent = formatTime(tt);
+            const now = Date.now();
+            if (now - lastSeek > 200) { lastSeek = now; seekTo(tt); }
+        });
+        bar.addEventListener('change', () => {
+            const dur = getVideoDuration();
+            seekTo(dur * bar.value / 1000);
+            dragging = false;
+        });
+        setInterval(() => {
+            if (currentMode !== 'edit' || dragging) return;
+            const dur = getVideoDuration();
+            if (!dur) return;
+            const tt = getCurrentTime();
+            bar.value = Math.round(Math.min(1, tt / dur) * 1000);
+            cur.textContent = formatTime(tt);
+            tot.textContent = formatTime(dur);
+        }, 250);
+    })();
+
+    // ================= [תיקון 33] כל הכתוביות: תיקון מילה במשפט בודד =================
+    function renderAllSubtitles() {
+        const box = document.getElementById('allSubsList');
+        if (!box) return;
+        box.innerHTML = '';
+        if (!globalRawSrtClips || globalRawSrtClips.length === 0) {
+            const d = document.createElement('div');
+            d.style.cssText = 'padding:10px;color:#78909c;';
+            d.textContent = 'טען קובץ כתוביות כדי לראות אותן כאן.';
+            box.appendChild(d);
+            return;
+        }
+        globalRawSrtClips.forEach((c, ci) => {
+            const row = document.createElement('div');
+            row.className = 'sub-row';
+            const tm = document.createElement('span');
+            tm.className = 'sub-time';
+            tm.textContent = formatTime(c.start);
+            tm.addEventListener('click', () => seekTo(Math.max(0, c.start)));
+            row.appendChild(tm);
+            c.text.split(/\s+/).filter(Boolean).forEach((w, wi) => {
+                const sp = document.createElement('span');
+                sp.className = 'sub-word';
+                sp.textContent = w;
+                sp.addEventListener('click', () => editSubtitleWord(ci, wi));
+                row.appendChild(sp);
+                row.appendChild(document.createTextNode(' '));
+            });
+            box.appendChild(row);
+        });
+    }
+    function editSubtitleWord(ci, wi) {
+        const c = globalRawSrtClips[ci];
+        if (!c) return;
+        const words = c.text.split(/\s+/).filter(Boolean);
+        const old = words[wi];
+        const val = prompt('תיקון המילה "' + old + '" (במשפט הזה בלבד). אפשר להשאיר ריק כדי למחוק אותה:', old);
+        if (val === null) return;
+        const nv = val.trim();
+        if (nv === old) return;
+        if (nv === '') words.splice(wi, 1); else words[wi] = nv;
+        c.text = words.join(' ');
+        saveData();
+        const box = document.getElementById('allSubsList');
+        const top = box.scrollTop;
+        renderAllSubtitles();
+        box.scrollTop = top;
+    }
+
+    // ================= [תיקון 33] הגדרות יצירת סצנות אוטומטית =================
+    const AUTOGEN_KEY = 'ninjagoAutogen';
+    const AUTOGEN_DEFAULTS = { minWords: 3, maxWords: 8, minSec: 0, maxSec: 6, padStart: 0.3, padEnd: 0.12, maxGap: 1.5, join: true, type: 'tracing', show: false };
+    function loadAutogenRaw() {
+        let o = {};
+        try { o = JSON.parse(localStorage.getItem(AUTOGEN_KEY) || '{}') || {}; } catch (e) { o = {}; }
+        return Object.assign({}, AUTOGEN_DEFAULTS, o);
+    }
+    function getAutogenSettings() {
+        const num = (id, def) => { const v = parseFloat(document.getElementById(id).value); return isFinite(v) && v >= 0 ? v : def; };
+        const s = {
+            minWords: Math.max(1, Math.round(num('agMinWords', AUTOGEN_DEFAULTS.minWords))),
+            maxWords: Math.max(1, Math.round(num('agMaxWords', AUTOGEN_DEFAULTS.maxWords))),
+            minSec: num('agMinSec', AUTOGEN_DEFAULTS.minSec),
+            maxSec: num('agMaxSec', AUTOGEN_DEFAULTS.maxSec),
+            padStart: num('agPadStart', AUTOGEN_DEFAULTS.padStart),
+            padEnd: num('agPadEnd', AUTOGEN_DEFAULTS.padEnd),
+            maxGap: num('agMaxGap', AUTOGEN_DEFAULTS.maxGap),
+            join: document.getElementById('agJoin').checked,
+            type: document.getElementById('agType').value || 'tracing',
+            show: document.getElementById('agShow').value === 'on'
+        };
+        if (s.maxWords < s.minWords) { const x = s.minWords; s.minWords = s.maxWords; s.maxWords = x; }
+        if (s.maxSec < s.minSec) { const x = s.minSec; s.minSec = s.maxSec; s.maxSec = x; }
+        return s;
+    }
+    function fillAutogenForm(s) {
+        document.getElementById('agMinWords').value = s.minWords;
+        document.getElementById('agMaxWords').value = s.maxWords;
+        document.getElementById('agMinSec').value = s.minSec;
+        document.getElementById('agMaxSec').value = s.maxSec;
+        document.getElementById('agPadStart').value = s.padStart;
+        document.getElementById('agPadEnd').value = s.padEnd;
+        document.getElementById('agMaxGap').value = s.maxGap;
+        document.getElementById('agJoin').checked = !!s.join;
+        document.getElementById('agType').value = s.type;
+        document.getElementById('agShow').value = s.show ? 'on' : 'off';
+    }
+    function saveAutogen() { try { localStorage.setItem(AUTOGEN_KEY, JSON.stringify(getAutogenSettings())); } catch (e) {} }
+    function resetAutogen() { fillAutogenForm(AUTOGEN_DEFAULTS); saveAutogen(); }
+    fillAutogenForm(loadAutogenRaw());
+    document.getElementById('tab-autogen').addEventListener('change', saveAutogen);
 
     // [תיקון 2] כשהדף נטען: ממלאים את רשימת הפרויקטים ומנסים לטעון את הפרויקט האחרון.
     // (הטעינה בפועל תתבצע רק כשגם נגן היוטיוב מוכן.)
