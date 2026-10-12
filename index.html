@@ -661,6 +661,9 @@
                         <button class="btn-action btn-small" onclick="applyBulkType()">החל</button>
                     </div>
 
+                    <!-- [תיקון 36] הועבר מלשונית "מערכת" -->
+                    <div style="margin-bottom: 12px;"><button class="btn-danger btn-small" onclick="deleteAllScenesInProject()">מחק כל הסצנות 🗑️</button></div>
+
                     <label style="display:block; margin-bottom: 12px; cursor: pointer;"><input type="checkbox" id="chkOnlyReported" onchange="renderScenes()" style="transform: scale(1.4); margin-left: 8px;"> הצג רק סצנות שדווחו 🚩 <span id="reportedCount"></span></label>
 
                     <div id="scenesListContainer">
@@ -700,7 +703,6 @@
                 <div class="control-group" style="border: 2px solid #ffcdd2;">
                     <h3 style="margin-top:0; color:#b71c1c;">⚠️ אזור מסוכן</h3>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn-danger" style="flex: 1;" onclick="deleteAllScenesInProject()">מחק כל הסצנות 🗑️</button>
                         <button class="btn-danger" style="flex: 1; background-color: #b71c1c;" onclick="resetEntireSystem()">איפוס מערכת ⚠️</button>
                     </div>
                 </div>
@@ -812,7 +814,8 @@
     const IMG_MAX = 200;                    // כמה תמונות נשמרות לכל היותר (הישנות נמחקות)
     let currentSession = null, currentRecord = null, practice = null, logCache = null, imageStore = null;
 
-    const ytElement = document.getElementById('youtubePlayer');
+    // [תיקון 36] אחרי יצירת הנגן, יוטיוב מחליף את ה-div ב-iframe עם אותו מזהה, ולכן תמיד מחפשים את האלמנט החי
+    const ytEl = () => document.getElementById('youtubePlayer');
     const localElement = document.getElementById('localPlayer');
     const overlay = document.getElementById('audioOnlyOverlay');
     const gamePlaceholder = document.getElementById('gameVideoPlaceholder');
@@ -1017,7 +1020,7 @@
         updateTimeDisplay();
         renderScenes();
         
-        ytElement.style.display = 'none';
+        ytEl().style.display = 'none';
         localElement.style.display = 'none';
         
         if (ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
@@ -1038,6 +1041,36 @@
             select.appendChild(option);
         });
         if (currentVal && allData[currentVal]) select.value = currentVal;
+    }
+
+    // [תיקון 36] יוצר את נגן היוטיוב. כשמועברים אותו בין מסכים (עריכה/משחק) הדפדפן טוען את ה-iframe מחדש
+    // עם הסרטון המקורי, ולכן בכל מעבר יוצרים אותו מחדש עם הסרטון של הפרויקט הנוכחי.
+    const YT_VARS = { 'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'modestbranding': 1, 'rel': 0, 'iv_load_policy': 3 };
+    function createYtPlayer(vid, onReady) {
+        let done = false;
+        const fin = () => { if (!done) { done = true; if (onReady) onReady(); } };
+        ytPlayer = new YT.Player('youtubePlayer', {
+            videoId: vid,
+            playerVars: YT_VARS,
+            events: { 'onStateChange': onPlayerStateChange, 'onReady': fin }
+        });
+        setTimeout(fin, 4000); // רשת ביטחון: ממשיכים גם אם onReady לא הגיע
+    }
+    function recreateYtPlayer(onReady) {
+        if (videoType !== 'youtube' || !currentVideoId || !ytReady || typeof YT === 'undefined' || !YT.Player) {
+            if (onReady) onReady();
+            return;
+        }
+        const vid = currentVideoId.replace("YT_", "");
+        try { if (ytPlayer && typeof ytPlayer.destroy === 'function') ytPlayer.destroy(); } catch (e) {}
+        ytPlayer = null;
+        if (!ytEl()) {
+            const holder = document.createElement('div');
+            holder.id = 'youtubePlayer';
+            editVideoWrapper.insertBefore(holder, editVideoWrapper.firstChild);
+        }
+        ytEl().style.display = 'block';
+        createYtPlayer(vid, onReady);
     }
 
     function loadSelectedProject() {
@@ -1082,15 +1115,9 @@
         if (videoType === 'youtube') {
             const vid = currentVideoId.replace("YT_", "");
             localElement.style.display = 'none';
-            ytElement.style.display = 'block';
-            if (ytPlayer) ytPlayer.loadVideoById(vid);
-            else if (ytReady) {
-                ytPlayer = new YT.Player('youtubePlayer', {
-                    videoId: vid,
-                    playerVars: { 'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'modestbranding': 1, 'rel': 0, 'iv_load_policy': 3 },
-                    events: { 'onStateChange': onPlayerStateChange }
-                });
-            }
+            ytEl().style.display = 'block';
+            if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') ytPlayer.loadVideoById(vid);
+            else if (ytReady) createYtPlayer(vid);
         }
         updateSrtOffsetDisplay();
         renderScenes();
@@ -1112,15 +1139,10 @@
             currentProjectName = projName;
             
             localElement.style.display = 'none';
-            ytElement.style.display = 'block';
+            ytEl().style.display = 'block';
 
-            if (ytPlayer) ytPlayer.loadVideoById(vid);
-            else if (ytReady) {
-                ytPlayer = new YT.Player('youtubePlayer', {
-                    videoId: vid,
-                    playerVars: { 'playsinline': 1, 'controls': 0, 'disablekb': 1, 'fs': 0, 'modestbranding': 1, 'rel': 0, 'iv_load_policy': 3 }
-                });
-            }
+            if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') ytPlayer.loadVideoById(vid);
+            else if (ytReady) createYtPlayer(vid);
         }
         
         let allData = JSON.parse(localStorage.getItem('ninjagoData')) || {};
@@ -1514,7 +1536,7 @@
             document.getElementById('modeToggleBtn').innerText = "חזור לעריכה ⚙️";
             gamePlaceholder.appendChild(editVideoWrapper);
             
-            setTimeout(() => { startGame(); }, 150);
+            recreateYtPlayer(() => { setTimeout(startGame, 150); }); // [תיקון 36]
         } else {
             currentMode = 'edit';
             // [תיקון 19] עוצרים כל ניגון או המתנה שנשארו מהמשחק
@@ -1539,6 +1561,7 @@
             practice = null;
             document.getElementById('subtitleBlocker').style.display = 'none'; // תמיד כבוי בעריכה
             pauseVideo();
+            recreateYtPlayer(); // [תיקון 36] ההעברה בין המסכים טוענת את ה-iframe מחדש, אז מחזירים את הסרטון הנכון
         }
     }
 
@@ -3193,7 +3216,7 @@
     const VF_RAW = [
       { ch: 'א', strokes: [
         [[79.9,30.2],[77.4,26.9],[74.8,23.9],[71.9,21.0],[68.9,18.3],[65.6,16.0],[62.0,14.1],[58.1,12.7],[54.2,11.9],[50.1,11.4],[46.1,11.5],[42.1,12.1],[38.2,13.2],[34.4,14.8],[31.0,16.9],[27.8,19.4],[25.0,22.4],[22.7,25.7],[20.7,29.2],[19.1,33.0],[18.0,36.9],[17.2,40.8],[16.7,44.9],[16.5,48.9],[16.6,53.0],[17.1,57.0],[17.8,61.0],[18.9,64.9],[20.4,68.7],[22.3,72.2],[24.6,75.6],[27.3,78.6],[30.3,81.3],[33.6,83.6],[37.3,85.4],[41.1,86.7],[45.1,87.5],[49.1,87.8],[53.2,87.6],[57.2,86.8],[61.1,85.6],[64.7,83.9],[68.1,81.6],[71.2,79.0],[74.0,76.1],[76.7,73.0],[79.2,69.8]],
-        [[0.0,13.1],[0.0,17.2],[0.0,21.3],[0.0,25.4],[0.0,29.5],[0.0,33.6],[0.0,37.7],[0.0,41.8],[0.0,45.9],[0.0,50.0],[0.0,54.1],[0.0,58.2],[0.0,62.3],[0.0,66.4],[0.0,70.5],[0.0,74.6],[0.0,78.7],[0.1,82.8],[0.3,86.9]]
+        [[10,13.1],[10,17.2],[10,21.3],[10,25.4],[10,29.5],[10,33.6],[10,37.7],[10,41.8],[10,45.9],[10,50],[10,54.1],[10,58.2],[10,62.3],[10,66.4],[10,70.5],[10,74.6],[10,78.7],[10.1,82.8],[10.3,86.9]]
       ]},
       { ch: 'ב', strokes: [
         [[2.8,21.9],[6.2,19.7],[9.7,17.7],[13.3,15.9],[17.0,14.3],[20.9,12.9],[24.7,11.8],[28.7,10.9],[32.7,10.4],[36.7,10.1],[40.8,10.3],[44.8,11.0],[48.7,11.9],[52.5,13.3],[56.2,15.0],[59.6,17.2],[62.8,19.7],[65.7,22.5],[68.3,25.6],[70.6,28.9],[72.7,32.4],[74.4,36.0],[75.8,39.8],[77.0,43.7],[77.9,47.6],[78.7,51.6],[79.2,55.6],[79.4,59.6],[79.5,63.7],[79.4,67.7],[79.1,71.8],[78.5,75.8],[77.4,79.7],[74.8,82.6],[70.9,83.0],[67.0,81.9],[63.2,80.4],[59.5,78.9],[55.6,77.6],[51.7,76.6],[47.7,75.8],[43.7,75.4],[39.7,75.2],[35.6,75.3],[31.6,75.7],[27.6,76.3],[23.7,77.3],[19.8,78.5],[16.0,79.9],[12.4,81.7],[8.9,83.7],[5.5,86.0],[2.2,88.3]]
@@ -3237,7 +3260,7 @@
         [[68.7,10.0],[67.8,12.9],[67.0,15.8],[66.2,18.7],[65.5,21.7],[64.9,24.6],[64.3,27.6],[63.7,30.6],[63.1,33.6],[62.6,36.5],[62.1,39.5],[61.7,42.5],[61.2,45.5],[60.8,48.5],[60.4,51.5],[60.1,54.5],[59.7,57.5],[59.4,60.5],[59.1,63.5],[58.8,66.6],[58.5,69.6],[58.3,72.6],[58.0,75.6],[57.8,78.6],[57.6,81.7],[57.4,84.7],[57.2,87.7],[56.5,88.7],[54.8,86.2],[53.1,83.7],[51.5,81.2],[49.8,78.6],[48.1,76.1],[46.5,73.6],[44.9,71.0],[43.3,68.4],[41.7,65.9],[40.1,63.3],[38.5,60.7],[37.0,58.1],[35.4,55.5],[33.9,52.9],[32.4,50.3],[30.9,47.6],[29.3,45.0],[27.8,42.4],[26.3,39.8],[24.8,37.2],[23.2,34.6],[21.7,32.0],[20.1,29.4],[18.6,26.8],[17.0,24.2],[15.4,21.6],[13.7,19.1],[12.1,16.5],[10.4,14.0],[9.4,14.9],[8.6,17.9],[8.0,20.8],[7.3,23.8],[6.7,26.8],[6.2,29.7],[5.7,32.7],[5.2,35.7],[4.7,38.7],[4.3,41.7],[3.9,44.7],[3.5,47.7],[3.2,50.7],[2.9,53.7],[2.6,56.7],[2.3,59.8],[2.1,62.8],[1.9,65.8],[1.7,68.8],[1.5,71.8],[1.4,74.9],[1.3,77.9],[1.2,80.9],[1.1,83.9],[1.0,87.0],[1.0,90.0]]
       ]},
       { ch: 'ם', strokes: [
-        [[7.4,30.0],[9.6,26.5],[12.3,23.2],[15.2,20.3],[18.5,17.6],[22.0,15.4],[25.7,13.5],[29.6,12.0],[33.7,10.9],[37.8,10.2],[42.0,10.0],[46.2,10.2],[50.3,10.9],[54.4,12.0],[58.3,13.5],[62.0,15.4],[65.5,17.6],[68.8,20.3],[71.7,23.2],[74.4,26.5],[76.6,30.0],[78.5,33.7],[80.0,37.6],[81.1,41.7],[81.8,45.8],[82.0,50.0],[81.8,54.2],[81.1,58.3],[80.0,62.4],[78.5,66.3],[76.6,70.0],[74.4,73.5],[71.7,76.8],[68.8,79.7],[65.5,82.4],[62.0,84.6],[58.3,86.5],[54.4,88.0],[50.3,89.1],[46.2,89.8],[42.0,90.0],[37.8,89.8],[33.7,89.1],[29.6,88.0],[25.7,86.5],[22.0,84.6],[18.5,82.4],[15.2,79.7],[12.3,76.8],[9.6,73.5],[7.4,70.0],[5.5,66.3],[4.0,62.4],[2.9,58.3],[2.2,54.2],[2.0,50.0],[2,47],[2,44],[2,41],[2,38],[2,35],[2,32],[2,29],[2,26],[2,23],[2,20],[2,17],[2,14],[2,11],[2,10],[2,13],[2,16],[2,19],[2,22],[2,25],[2,28],[2,31],[2,34],[2,37],[2,40],[2,43],[2,46],[2,49],[2,52],[2,55],[2,58],[2,61],[2,64],[2,67],[2,70],[2,73],[2,76],[2,79],[2,82],[2,85],[2,88],[2,91],[2,94],[2,97],[2,100],[2,103],[2,106],[2,109],[2,112],[2,115],[2,118],[2,121],[2,124],[2,127],[2,130],[2,133]]
+        [[7.4,30],[9.6,26.5],[12.3,23.2],[15.2,20.3],[18.5,17.6],[22,15.4],[25.7,13.5],[29.6,12],[33.7,10.9],[37.8,10.2],[42,10],[46.2,10.2],[50.3,10.9],[54.4,12],[58.3,13.5],[62,15.4],[65.5,17.6],[68.8,20.3],[71.7,23.2],[74.4,26.5],[76.6,30],[78.5,33.7],[80,37.6],[81.1,41.7],[81.8,45.8],[82,50],[81.8,54.2],[81.1,58.3],[80,62.4],[78.5,66.3],[76.6,70],[74.4,73.5],[71.7,76.8],[68.8,79.7],[65.5,82.4],[62,84.6],[58.3,86.5],[54.4,88],[50.3,89.1],[46.2,89.8],[42,90],[37.8,89.8],[33.7,89.1],[29.6,88],[25.7,86.5],[22,84.6],[18.5,82.4],[15.2,79.7],[12.3,76.8],[9.6,73.5],[7.4,70],[5.5,66.3],[4,62.4],[2.9,58.3],[2.2,54.2],[2,50],[2,47],[2,44],[2,41],[2,38],[2,35],[2,32],[2,29],[2,26],[2,23],[2,20],[2,17],[2,14],[2,11],[2,10],[2,13],[2,16],[2,19],[2,22],[2,25],[2,28],[2,31],[2,34],[2,37],[2,40],[2,43],[2,46],[2,49],[2,52],[2,55],[2,58],[2,61],[2,64],[2,67],[2,70],[2,73],[2,76],[2,79],[2,82],[2,85],[2,88],[2,90]]
       ]},
       { ch: 'נ', strokes: [
         [[46.7,12.0],[46.9,16.1],[47.0,20.1],[47.0,24.2],[47.0,28.3],[47.0,32.3],[47.0,36.4],[47.0,40.5],[47.0,44.5],[47.0,48.6],[47.0,52.7],[47.0,56.8],[47.0,60.8],[46.9,64.9],[46.8,69.0],[46.4,73.0],[45.7,77.0],[44.3,80.8],[42.0,84.2],[38.9,86.8],[35.2,88.4],[31.2,89.4],[27.2,89.9],[23.1,90.2],[19.1,90.3],[15.0,90.3],[10.9,90.3],[6.9,90.2],[2.8,89.9]]
@@ -3331,6 +3354,7 @@
     });
 
     const VF_Y_TOP = -35, VF_Y_SPAN = 170;       // טווח האנכי של האותיות, כולל עולות ויורדות
+    const VF_MARGIN = 36;                           // [תיקון 36] שוליים מצדי השורה, בפיקסלים
     const VF_LETTER_GAP = 16, VF_WORD_GAP = 46;   // רווחים ביחידות
     const VF_COLORS = { faded: '#cfe3f7', lit: '#1e88e5', arrow: '#ff9800', rule: '#e3eef9' };
     let vf = null, vfRaf = 0;
@@ -3372,7 +3396,7 @@
         vfCv.width = Math.round(vf.W * DPR); vfCv.height = Math.round(vf.H * DPR);
         vf.DPR = DPR;
         let S = (vf.H - 20) / VF_Y_SPAN;
-        const availW = vf.W - 24;
+        const availW = vf.W - 2 * VF_MARGIN;
         const maxUnits = Math.max.apply(null, vf.words.map(w => w.units));
         if (maxUnits * S > availW) S = availW / maxUnits;
         vf.S = S;
@@ -3380,13 +3404,13 @@
     }
     // קובע אילו מילים מוצגות עכשיו על השורה ואת מיקום כל אות (מימין לשמאל)
     function vfPlaceLine() {
-        const S = vf.S, availW = vf.W - 24;
+        const S = vf.S, availW = vf.W - 2 * VF_MARGIN;
         // אם המילה הנוכחית לא נכנסת אחרי המילים שכבר מוצגות, מנקים את השורה
         let used = 0;
         for (let k = vf.lineStart; k < vf.wi; k++) used += vf.words[k].units * S + VF_WORD_GAP * S;
         if (vf.wi > vf.lineStart && used + vf.words[vf.wi].units * S > availW) vf.lineStart = vf.wi;
         vf.pos = [];
-        let right = vf.W - 12;
+        let right = vf.W - VF_MARGIN;
         for (let k = vf.lineStart; k <= vf.wi; k++) {
             const w = vf.words[k];
             let cursor = right;
