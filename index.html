@@ -3349,13 +3349,13 @@
         let x0 = 1e9, x1 = -1e9;
         L.paths.forEach(p => p.forEach(q => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); }));
         L.box = { x0: x0, w: x1 - x0 };
-        L.slotW = Math.max(L.box.w, 24); // אותיות צרות (ו, י) מקבלות רוחב מינימלי
+        L.slotW = Math.max(L.box.w, 8); // אותיות צרות (ו, י) מקבלות רוחב מינימלי
         VF[L.ch] = L;
     });
 
     const VF_Y_TOP = -35, VF_Y_SPAN = 170;       // טווח האנכי של האותיות, כולל עולות ויורדות
     const VF_MARGIN = 36;                           // [תיקון 36] שוליים מצדי השורה, בפיקסלים
-    const VF_LETTER_GAP = 16, VF_WORD_GAP = 46;   // רווחים ביחידות
+    const VF_LETTER_GAP = 16, VF_WORD_GAP = 64;   // רווחים ביחידות
     const VF_COLORS = { faded: '#cfe3f7', lit: '#1e88e5', arrow: '#ff9800', rule: '#e3eef9' };
     let vf = null, vfRaf = 0;
     const vfCv = document.getElementById('vfCanvas');
