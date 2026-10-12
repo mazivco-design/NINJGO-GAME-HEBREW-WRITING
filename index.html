@@ -355,9 +355,9 @@
         #exitSlider span { position: absolute; left: 54px; right: 8px; top: 0; line-height: 40px; font-size: 13px; color: #78909c; text-align: center; pointer-events: none; }
         #exitThumb { position: absolute; top: 3px; left: 3px; width: 48px; height: 34px; border-radius: 17px; background: #ffb300; text-align: center; line-height: 34px; font-size: 18px; touch-action: none; cursor: grab; }
         /* [תיקון 24] כתיבה חופשית: המשפט הנכון נחשף והילד מאשר בעצמו */
-        #selfCheckPanel { display: flex; align-items: center; gap: 12px; background: #fffde7; border: 3px solid #ffb300; border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; }
-        #selfCheckPanel .sc-text { flex: 1; text-align: center; font-family: Arial, sans-serif; font-size: clamp(24px, 3.6vw, 38px); font-weight: bold; color: #1565c0; }
-        #selfCheckPanel .game-btn { width: auto; min-width: 150px; }
+        #selfCheckPanel, #verifyPanel { display: flex; align-items: center; gap: 12px; background: #fffde7; border: 3px solid #ffb300; border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; }
+        #selfCheckPanel .sc-text, #verifyPanel .sc-text { flex: 1; text-align: center; font-family: Arial, sans-serif; font-size: clamp(24px, 3.6vw, 38px); font-weight: bold; color: #1565c0; }
+        #selfCheckPanel .game-btn, #verifyPanel .game-btn { width: auto; min-width: 150px; }
         /* [תיקון 25] דוח */
         .rep-session { margin: 14px 0 6px; font-size: 17px; color: #37474f; border-bottom: 2px solid #cfd8dc; padding-bottom: 4px; }
         .rep-item { border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: #fff; page-break-inside: avoid; }
@@ -523,6 +523,10 @@
                     <!-- [תיקון 19] ניגון מלא: הסרטון מתנגן ברצף ונעצר רק בנקודות התרגילים -->
                     <label style="display:block; margin-top:10px;">
                         <input type="checkbox" id="chkFullPlay" style="transform: scale(1.5); margin-left: 10px;" onchange="saveSettingsIfProject()"> ניגון מלא של הסרטון במשחק (הסרטון מתנגן עד התרגיל, ואחרי תשובה נכונה ממשיך עד התרגיל הבא)
+                    </label>
+                    <!-- [תיקון 37] בדיקה עצמית של הילד מול הכתובית הצרובה בסרטון -->
+                    <label style="display:block; margin-top:10px;">
+                        <input type="checkbox" id="chkSelfVerify" style="transform: scale(1.5); margin-left: 10px;" onchange="saveSettingsIfProject()"> בדיקה עצמית בסוף כל תרגיל (הילד משווה למה שכתוב בכתובית הצרובה בסרטון)
                     </label>
                 </div>
             </div>
@@ -742,6 +746,14 @@
             <button class="btn-danger game-btn" id="btnSelfWrong">✘ לא נכון</button>
         </div>
         
+        <!-- [תיקון 37] בדיקה עצמית מול הכתובית הצרובה: הסרטון נחשף והילד מחליט אם זה זהה -->
+        <div id="verifyPanel" class="hidden">
+            <button class="btn-success game-btn" id="btnVerifyOk">✔ זה זהה</button>
+            <div class="sc-text" id="verifyText" style="font-size: clamp(18px, 2.6vw, 28px);">השווה את מה שכתבת לכתובית בסרטון</div>
+            <button class="btn-nav game-btn" id="btnVerifyReplay">▶ הראה שוב</button>
+            <button class="btn-danger game-btn" id="btnVerifyDiff">✘ יש הבדל</button>
+        </div>
+
         <div class="notebook-area" id="notebookArea">
             <div class="notebook-line"></div>
             <div id="fadedText" class="notebook-text hidden"></div>
@@ -1012,6 +1024,7 @@
         document.getElementById('chkShowInGame').checked = false;
         document.getElementById('chkBlockSubtitles').checked = true;
         document.getElementById('chkFullPlay').checked = false;
+        document.getElementById('chkSelfVerify').checked = false;
         
         srtFileInput.value = '';
         dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
@@ -1088,6 +1101,7 @@
             srtOffset = 0;
             document.getElementById('chkBlockSubtitles').checked = true;
             document.getElementById('chkFullPlay').checked = false;
+            document.getElementById('chkSelfVerify').checked = false;
         } else {
             scenes = projData.scenes || [];
             currentVideoId = projData.videoId;
@@ -1096,6 +1110,7 @@
             srtOffset = projData.srtOffset || 0;
             document.getElementById('chkBlockSubtitles').checked = projData.blockSubtitles !== false;
             document.getElementById('chkFullPlay').checked = projData.fullPlay === true;
+            document.getElementById('chkSelfVerify').checked = projData.selfVerify === true;
         }
 
         // [תיקון 2] זוכרים שזה הפרויקט האחרון שנפתח, כדי לטעון אותו אוטומטית בפעם הבאה.
@@ -1152,7 +1167,8 @@
              srtOffset = allData[currentProjectName].srtOffset || 0; updateSrtOffsetDisplay();
              document.getElementById('chkBlockSubtitles').checked = allData[currentProjectName].blockSubtitles !== false;
              document.getElementById('chkFullPlay').checked = allData[currentProjectName].fullPlay === true;
-        } else { scenes = []; globalRawSrtClips = []; srtOffset = 0; updateSrtOffsetDisplay(); document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; }
+             document.getElementById('chkSelfVerify').checked = allData[currentProjectName].selfVerify === true;
+        } else { scenes = []; globalRawSrtClips = []; srtOffset = 0; updateSrtOffsetDisplay(); document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; document.getElementById('chkSelfVerify').checked = false; }
         
         saveData();
     }
@@ -1361,7 +1377,8 @@
             srtClips: globalRawSrtClips,
             srtOffset: srtOffset,
             blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
-            fullPlay: document.getElementById('chkFullPlay').checked
+            fullPlay: document.getElementById('chkFullPlay').checked,
+            selfVerify: document.getElementById('chkSelfVerify').checked
         };
 
         if (currentProjectName && currentProjectName !== projName) { delete allData[currentProjectName]; }
@@ -1383,7 +1400,8 @@
             srtClips: globalRawSrtClips,
             srtOffset: srtOffset,
             blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
-            fullPlay: document.getElementById('chkFullPlay').checked
+            fullPlay: document.getElementById('chkFullPlay').checked,
+            selfVerify: document.getElementById('chkSelfVerify').checked
         };
         localStorage.setItem('ninjagoData', JSON.stringify(allData));
     }
@@ -1678,6 +1696,7 @@
     }
 
     function loadGameScene(opts) {
+        verifyPassedFor = null; // [תיקון 37]
         const activeScenes = getActiveScenes();
         if (currentGameIndex >= activeScenes.length) {
             setPlayingVideoUI(false);
@@ -2028,11 +2047,13 @@
             return; // [תיקון 34] אין כפתור "סיימתי" בסוג הזה
         } else if (type === 'freewrite') {
             if (!hasInk()) { showGameMessage("כתוב קודם ✍️", "כתוב את המשפט על הלוח, ואז לחץ על \"סיימתי\"."); return; }
+            if (selfVerifyOn()) { recordAttempt({ self: true, img: captureCanvasImage() }); openVerify(scene); return; } // [תיקון 37]
             openSelfCheck(scene);
         } else {
             const userInput = document.getElementById('keyboardInput').value;
             const ok = normalizeHebrew(userInput) === normalizeHebrew(scene.text);
             recordAttempt({ ok: ok, typed: userInput.trim() });
+            if (selfVerifyOn()) { openVerify(scene); return; } // [תיקון 37] הילד מחליט מול הכתובית; ההשוואה לטקסט נשמרת בדוח כרמז בלבד
             if (ok) {
                 finishRecord('correct');
                 rewardAndPlayFullVideo();
@@ -2044,6 +2065,7 @@
 
     function rewardAndPlayFullVideo() {
         const scene = getActiveScenes()[currentGameIndex];
+        if (scene && selfVerifyOn() && verifyPassedFor !== scene.id) { openVerify(scene); return; } // [תיקון 37]
         document.getElementById('btnDoneWriting').classList.add('hidden');
         document.getElementById('btnClearCanvas').classList.add('hidden');
         document.getElementById('btnToggleEraser').classList.add('hidden');
@@ -2364,7 +2386,8 @@
         const maxW = Math.max(200, document.getElementById('gameTop').clientWidth - 190 - 12);
         const headerH = document.getElementById('gameHeader').offsetHeight + 6 + (document.getElementById('progressTrack').offsetHeight + 6);
         const selfPanel = document.getElementById('selfCheckPanel');
-        const selfH = selfPanel.classList.contains('hidden') ? 0 : selfPanel.offsetHeight + 6;
+        const verifyPanel = document.getElementById('verifyPanel');
+        const selfH = (selfPanel.classList.contains('hidden') ? 0 : selfPanel.offsetHeight + 6) + (verifyPanel.classList.contains('hidden') ? 0 : verifyPanel.offsetHeight + 6);
         const avail = vh - 28 - 8 - 6 - 6 - areaH - kbTotal - headerH - selfH;
         let videoH = Math.max(150, Math.min(avail, maxW * 9 / 16));
         videoH = Math.min(Math.max(videoH, sideH), maxW * 9 / 16); // אם עמודת הכפתורים גבוהה יותר, הסרטון מתרחב אליה בחינם
@@ -2769,7 +2792,75 @@
     function hideSelfCheck() {
         const panel = document.getElementById('selfCheckPanel');
         if (panel) panel.classList.add('hidden');
+        hideVerify();
     }
+
+    // ================= [תיקון 37] בדיקה עצמית מול הכתובית הצרובה =================
+    let verifyScene = null, verifyPassedFor = null;
+    function selfVerifyOn() { return !practiceList && !practice && document.getElementById('chkSelfVerify').checked; }
+    function verifyMidTime(s) { return (s.start + s.end) / 2; }
+    function openVerify(scene) {
+        verifyScene = scene;
+        hideHint();
+        ['btnDoneWriting', 'btnToggleEraser', 'btnClearCanvas', 'btnHint', 'btnPlayAudio'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        document.getElementById('onScreenKeyboard').classList.add('hidden');
+        document.getElementById('keyboardInput').blur();
+        overlay.style.display = 'none';
+        playingAudioOnly = false;
+        document.getElementById('subtitleBlocker').style.display = 'none';
+        if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
+        fullPlayAfter = null; fullPlayTarget = null;
+        seekTo(verifyMidTime(scene)); playVideo(); setTimeout(pauseVideo, 500); // מציגים פריים עם הכתובית
+        document.getElementById('verifyPanel').classList.remove('hidden');
+        layoutGame();
+    }
+    function hideVerify() {
+        const p = document.getElementById('verifyPanel');
+        if (p) p.classList.add('hidden');
+        if (verifyScene) {
+            verifyScene = null;
+            if (currentMode === 'game') document.getElementById('subtitleBlocker').style.display = document.getElementById('chkBlockSubtitles').checked ? 'block' : 'none';
+        }
+    }
+    function stopVerifyPlayback() {
+        if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
+        fullPlayAfter = null; fullPlayTarget = null;
+        pauseVideo();
+    }
+    document.getElementById('btnVerifyReplay').addEventListener('click', () => {
+        const s = verifyScene;
+        if (!s) return;
+        playUntil(s.start, s.end, () => { seekTo(verifyMidTime(s)); playVideo(); setTimeout(pauseVideo, 300); });
+    });
+    document.getElementById('btnVerifyOk').addEventListener('click', () => {
+        const s = verifyScene;
+        if (!s) return;
+        stopVerifyPlayback();
+        hideVerify();
+        if (currentRecord) { currentRecord.verify = 'same'; }
+        finishRecord('correct');
+        verifyPassedFor = s.id;
+        rewardAndPlayFullVideo();
+    });
+    document.getElementById('btnVerifyDiff').addEventListener('click', () => {
+        const s = verifyScene;
+        if (!s) return;
+        stopVerifyPlayback();
+        hideVerify();
+        if (currentRecord) { currentRecord.verify = 'diff'; currentRecord.verifyDiff = true; saveRecord(); }
+        const t = currentTaskType();
+        if (t === 'typing' || t === 'freewrite') {
+            // הילד יכול לשנות את מה שכתב, אז כותבים שוב
+            showGameMessage("בוא ננסה שוב 👀", "כתוב את המשפט מחדש, ובדוק שוב מול הכתובית בסרטון.", () => loadGameScene({ keepVideo: true, keepRecord: true }));
+        } else {
+            // בטרייסינג ובאותיות עם נקודת התחלה הילד עוקב אחרי הטקסט של האפליקציה, ולכן ההבדל הוא בטקסט הסצנה: מדווחים להורה וממשיכים
+            s.reportCount = (s.reportCount || 0) + 1;
+            saveSettingsIfProject();
+            if (currentRecord) currentRecord.reported = true;
+            finishRecord('correct');
+            showGameMessage("תודה! 🚩", "סימנו להורה שיש הבדל. ממשיכים.", () => { verifyPassedFor = s.id; rewardAndPlayFullVideo(); });
+        }
+    });
     function selfCheckResult(ok) {
         const scene = getActiveScenes()[currentGameIndex];
         if (currentRecord && currentRecord.attempts.length) currentRecord.attempts[currentRecord.attempts.length - 1].selfOk = ok;
@@ -2869,6 +2960,8 @@
         attempts.forEach(a => {
             if (a.typed !== undefined) h += '<div class="rep-attempt">' + (a.ok ? '✔' : '✘') + ' הילד כתב: "' + escapeHtml(a.typed) + '"</div>';
         });
+        if (r.verifyDiff) h += '<div class="rep-attempt">🔎 הילד סימן הבדל מהכתובית הצרובה' + (r.verify === 'same' ? ' ואז תיקן ואישר' : '') + '</div>';
+        else if (r.verify === 'same') h += '<div class="rep-attempt">🔎 הילד אישר שזה זהה לכתובית הצרובה</div>';
         if (r.reportText) h += '<div class="rep-attempt">🚩 הילד הציע: "' + escapeHtml(r.reportText) + '"</div>';
         const img = r.img ? getImage(r.img) : null;
         if (img) h += '<img class="rep-img" src="' + img + '" alt="">';
