@@ -253,6 +253,7 @@
         /* [תיקון 6] בתרגיל הקלדה השדה כותב בפונט רגיל (לא בכתב היד של הטרייסינג) */
         #keyboardInput { color: #000; font-family: Arial, sans-serif !important; pointer-events: none; } /* [תיקון 12] השדה לתצוגה בלבד, ההקלדה במקלדת שבדף */
         #drawingCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; cursor: crosshair; }
+        #vfCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; touch-action: none; } /* [תיקון 34] אותיות עם נקודת התחלה */
 
         .progress-bar { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; color: var(--secondary-color); }
         .hidden { display: none !important; }
@@ -578,7 +579,7 @@
                         <label for="agMaxGap">שקט שנחשב סוף דיבור (שניות)</label><input type="number" id="agMaxGap" min="0" max="10" step="0.1">
                         <label for="agJoin">לחבר שורות עד סימן פיסוק</label><input type="checkbox" id="agJoin" style="width:28px;height:28px;">
                         <label for="agType">סוג תרגיל לסצנות חדשות</label>
-                        <select id="agType"><option value="typing">⌨️ הקלדה</option><option value="tracing">✏️ טרייסינג</option><option value="freewrite">✍️ כתיבה חופשית</option></select>
+                        <select id="agType"><option value="typing">⌨️ הקלדה</option><option value="tracing">✏️ טרייסינג</option><option value="freewrite">✍️ כתיבה חופשית</option><option value="vector">✈️ אותיות עם נקודת התחלה</option></select>
                         <label for="agShow">סצנות חדשות יהיו</label>
                         <select id="agShow"><option value="off">כבויות (לבחירה שלי)</option><option value="on">פעילות</option></select>
                     </div>
@@ -623,6 +624,10 @@
                             <input type="radio" name="taskType" id="typeFree" value="freewrite"> 
                             <label for="typeFree">✍️ כתיבה חופשית (הילד מאשר בעצמו)</label>
                         </div>
+                        <div style="margin-top: 8px;">
+                            <input type="radio" name="taskType" id="typeVector" value="vector"> 
+                            <label for="typeVector">✈️ אותיות עם נקודת התחלה (מסלול מונחה)</label>
+                        </div>
                     </div>
                     
                     <div style="margin-top: 10px;">
@@ -650,6 +655,7 @@
                             <option value="typing">⌨️ הקלדה</option>
                             <option value="tracing">✏️ טרייסינג</option>
                             <option value="freewrite">✍️ כתיבה חופשית</option>
+                            <option value="vector">✈️ אותיות עם נקודת התחלה</option>
                         </select>
                         <label style="cursor: pointer;"><input type="checkbox" id="bulkOnlyActive" style="transform: scale(1.3); margin-left: 6px;"> רק פעילות</label>
                         <button class="btn-action btn-small" onclick="applyBulkType()">החל</button>
@@ -738,6 +744,7 @@
             <div class="notebook-line"></div>
             <div id="fadedText" class="notebook-text hidden"></div>
             <canvas id="drawingCanvas" class="hidden"></canvas>
+            <canvas id="vfCanvas" class="hidden"></canvas>
             <!-- [תיקון 17] הטקסט שהילד כותב מוצג כאן (עם סמן). השדה הנסתר מחזיק את הערך לבדיקה -->
             <div id="typedDisplay" class="notebook-text hidden" dir="rtl"></div>
             <input type="text" id="keyboardInput" style="position:absolute; left:-9999px; opacity:0; pointer-events:none;" tabindex="-1" readonly inputmode="none" aria-hidden="true" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -1371,7 +1378,7 @@
         tempEnd = s.end;
         updateTimeDisplay();
         document.getElementById('sceneText').value = s.text;
-        document.getElementById({ typing: 'typeTyping', tracing: 'typeTracing', freewrite: 'typeFree' }[sceneType(s)]).checked = true;
+        document.getElementById({ typing: 'typeTyping', tracing: 'typeTracing', freewrite: 'typeFree', vector: 'typeVector' }[sceneType(s)]).checked = true;
         document.getElementById('chkShowInGame').checked = s.show;
         document.getElementById('editSceneId').value = s.id;
         switchTab('manual'); // [תיקון 33] עוברים ישר למסך העריכה
@@ -1528,6 +1535,7 @@
             document.getElementById('modeToggleBtn').innerText = "מעבר למשחק 🎮";
             document.getElementById('editVideoSlot').appendChild(editVideoWrapper); // [תיקון 22] הסרטון חוזר לעמודה השמאלית
             hideSelfCheck();
+            vfStop(); // [תיקון 34]
             practice = null;
             document.getElementById('subtitleBlocker').style.display = 'none'; // תמיד כבוי בעריכה
             pauseVideo();
@@ -1691,7 +1699,9 @@
         const ruleEl = areaEl.querySelector('.notebook-line');
 
         // [תיקון 24] סוג התרגיל. אחרי "לא נכון" בכתיבה חופשית הסצנה הופכת זמנית לטרייסינג (תרגול)
-        const baseType = sceneType(scene);
+        let baseType = sceneType(scene);
+        if (baseType === 'vector' && vfWordsOf(scene.text).length === 0) baseType = 'tracing'; // [תיקון 34] אין אותיות עם מסלול במשפט: טרייסינג רגיל
+        vfStop();
         if (practice && practice.sceneId !== scene.id) practice = null;
         const type = (practice && practice.sceneId === scene.id) ? 'tracing' : baseType;
         if (!(opts && opts.keepRecord)) newRecord(scene, baseType); // [תיקון 25] רשומה חדשה בדוח
@@ -1713,6 +1723,21 @@
             setTimeout(() => { resizeCanvas(); layoutGame(); }, 50); // השהיה קלה לחישוב מדויק של המסך למניעת תקיעת העט
             // [תיקון 7] מחכים לטעינת הפונט ואז מתאימים שוב את גודל הטקסט
             if (document.fonts && document.fonts.load) { document.fonts.load("40px GveretLevin", scene.text).then(() => { fitFadedText(); layoutGame(); }).catch(() => {}); }
+        } else if (type === 'vector') {
+            // [תיקון 34] אותיות עם נקודת התחלה: אזור הכתיבה לבן, האותיות דהויות ונצבעות בכחול לאורך המסלול
+            faded.classList.add('hidden');
+            canvasEl.classList.add('hidden');
+            typedEl.classList.add('hidden');
+            clearBtn.classList.remove('hidden');     // "נקה לוח" מתחיל את המשפט מחדש
+            eraserBtn.classList.add('hidden');
+            hintBtn.classList.remove('hidden');      // רמז: החץ מראה את הקו הנוכחי
+            document.getElementById('btnDoneWriting').classList.add('hidden'); // ההשלמה היא ההצלחה
+            keyboardEl.classList.add('hidden');
+            appContainer.classList.remove('typing-task');
+            areaEl.classList.add('tracing-mode');
+            ruleEl.style.bottom = '';
+            vfStart(scene);
+            setTimeout(() => { if (vf) { vfLayout(); } layoutGame(); }, 50);
         } else if (type === 'freewrite') {
             // [תיקון 24] כתיבה חופשית: לוח ריק עם קו כתיבה, בלי המשפט. אחרי "סיימתי" המשפט נחשף והילד מאשר
             faded.classList.add('hidden');
@@ -1976,6 +2001,8 @@
             } else {
                 showGameMessage("נסה שוב", "נראה שפספסת קצת... נסה לעבור שוב על האותיות בתוך הקווים! ✏️");
             }
+        } else if (type === 'vector') {
+            return; // [תיקון 34] אין כפתור "סיימתי" בסוג הזה
         } else if (type === 'freewrite') {
             if (!hasInk()) { showGameMessage("כתוב קודם ✍️", "כתוב את המשפט על הלוח, ואז לחץ על \"סיימתי\"."); return; }
             openSelfCheck(scene);
@@ -2126,6 +2153,7 @@
     // (בעבר כל אירוע resize, למשל הופעת סרגל הכתובות באייפד, מחק את הציור של הילד).
     function syncCanvasSize() {
         if (currentMode !== 'game') return;
+        if (vfActive()) { document.getElementById('notebookArea').style.height = vfAreaHeight() + 'px'; vfLayout(); } // [תיקון 34]
         if (!canvas.classList.contains('hidden')) {
             fitFadedText(); // גם מתאים את גובה האזור למספר השורות
             const area = document.getElementById('notebookArea');
@@ -2284,6 +2312,7 @@
     }
     function showHint() {
         const scene = getActiveScenes()[currentGameIndex];
+        if (scene && currentTaskType() === 'vector') { vfHint(); return; } // [תיקון 34]
         if (!scene || (currentTaskType() !== 'typing' && currentTaskType() !== 'freewrite')) return;
         const box = document.getElementById('hintBox');
         if (!box.classList.contains('hidden')) { hideHint(); return; } // [תיקון 32] לחיצה שנייה מסתירה
@@ -2526,12 +2555,12 @@
     }
 
     // ================= [תיקון 27] סוגי תרגיל: הקלדה / טרייסינג / כתיבה חופשית =================
-    const TYPE_LABEL = { typing: '⌨️ הקלדה', tracing: '✏️ טרייסינג', freewrite: '✍️ כתיבה חופשית' };
+    const TYPE_LABEL = { typing: '⌨️ הקלדה', tracing: '✏️ טרייסינג', freewrite: '✍️ כתיבה חופשית', vector: '✈️ אותיות עם נקודת התחלה' };
     // סצנות ישנות נשמרו עם tracing בלבד, לכן הסוג נגזר ממנו כשאין שדה type
     function sceneType(s) { return s.type || (s.tracing ? 'tracing' : 'typing'); }
     function setSceneType(s, type) { s.type = type; s.tracing = (type === 'tracing'); }
     function typeOptionsHtml(sel) {
-        return ['typing', 'tracing', 'freewrite'].map(v => `<option value="${v}" ${v === sel ? 'selected' : ''}>${TYPE_LABEL[v]}</option>`).join('');
+        return ['typing', 'tracing', 'freewrite', 'vector'].map(v => `<option value="${v}" ${v === sel ? 'selected' : ''}>${TYPE_LABEL[v]}</option>`).join('');
     }
     function setSceneTypeById(id, type) {
         const s = scenes.find(x => x.id === id);
@@ -2559,7 +2588,8 @@
         return (practice && practice.sceneId === sc.id) ? 'tracing' : sceneType(sc);
     }
     function clearBoard() {
-        if (currentTaskType() === 'typing') setTyped('', 0);
+        if (currentTaskType() === 'vector') vfReset();
+        else if (currentTaskType() === 'typing') setTyped('', 0);
         else resizeCanvas();
     }
 
@@ -2590,16 +2620,17 @@
         return false;
     }
     // תמונה מכווצת של מה שהילד כתב (רקע לבן, JPEG), כדי לא לתפוס הרבה מקום
-    function captureCanvasImage() {
+    function captureCanvasImage(src) {
+        const cvs = src || canvas;
         const maxW = 520;
-        const scale = Math.min(1, maxW / canvas.width);
+        const scale = Math.min(1, maxW / cvs.width);
         const c = document.createElement('canvas');
-        c.width = Math.max(1, Math.round(canvas.width * scale));
-        c.height = Math.max(1, Math.round(canvas.height * scale));
+        c.width = Math.max(1, Math.round(cvs.width * scale));
+        c.height = Math.max(1, Math.round(cvs.height * scale));
         const x = c.getContext('2d');
         x.fillStyle = '#fff';
         x.fillRect(0, 0, c.width, c.height);
-        x.drawImage(canvas, 0, 0, c.width, c.height);
+        x.drawImage(cvs, 0, 0, c.width, c.height);
         return c.toDataURL('image/jpeg', 0.6);
     }
 
@@ -3154,6 +3185,362 @@
     function resetAutogen() { fillAutogenForm(AUTOGEN_DEFAULTS); saveAutogen(); }
     fillAutogenForm(loadAutogenRaw());
     document.getElementById('tab-autogen').addEventListener('change', saveAutogen);
+
+
+    // ================= [תיקון 34] סוג תרגיל רביעי: אותיות עם נקודת התחלה =================
+    // האותיות והמסלולים נלקחו מ"מטוס האותיות". כל מסלול הוא קו (או כמה קווים) בקופסה של 0-100, x ימינה ו-y למטה.
+    // הילד מניח את האצבע על החץ בנקודת ההתחלה ועובר לאורך המסלול. המשפט נחשף מילה אחרי מילה.
+    const VF_RAW = [
+      { ch: 'א', strokes: [
+        [[79.9,30.2],[77.4,26.9],[74.8,23.9],[71.9,21.0],[68.9,18.3],[65.6,16.0],[62.0,14.1],[58.1,12.7],[54.2,11.9],[50.1,11.4],[46.1,11.5],[42.1,12.1],[38.2,13.2],[34.4,14.8],[31.0,16.9],[27.8,19.4],[25.0,22.4],[22.7,25.7],[20.7,29.2],[19.1,33.0],[18.0,36.9],[17.2,40.8],[16.7,44.9],[16.5,48.9],[16.6,53.0],[17.1,57.0],[17.8,61.0],[18.9,64.9],[20.4,68.7],[22.3,72.2],[24.6,75.6],[27.3,78.6],[30.3,81.3],[33.6,83.6],[37.3,85.4],[41.1,86.7],[45.1,87.5],[49.1,87.8],[53.2,87.6],[57.2,86.8],[61.1,85.6],[64.7,83.9],[68.1,81.6],[71.2,79.0],[74.0,76.1],[76.7,73.0],[79.2,69.8]],
+        [[0.0,13.1],[0.0,17.2],[0.0,21.3],[0.0,25.4],[0.0,29.5],[0.0,33.6],[0.0,37.7],[0.0,41.8],[0.0,45.9],[0.0,50.0],[0.0,54.1],[0.0,58.2],[0.0,62.3],[0.0,66.4],[0.0,70.5],[0.0,74.6],[0.0,78.7],[0.1,82.8],[0.3,86.9]]
+      ]},
+      { ch: 'ב', strokes: [
+        [[2.8,21.9],[6.2,19.7],[9.7,17.7],[13.3,15.9],[17.0,14.3],[20.9,12.9],[24.7,11.8],[28.7,10.9],[32.7,10.4],[36.7,10.1],[40.8,10.3],[44.8,11.0],[48.7,11.9],[52.5,13.3],[56.2,15.0],[59.6,17.2],[62.8,19.7],[65.7,22.5],[68.3,25.6],[70.6,28.9],[72.7,32.4],[74.4,36.0],[75.8,39.8],[77.0,43.7],[77.9,47.6],[78.7,51.6],[79.2,55.6],[79.4,59.6],[79.5,63.7],[79.4,67.7],[79.1,71.8],[78.5,75.8],[77.4,79.7],[74.8,82.6],[70.9,83.0],[67.0,81.9],[63.2,80.4],[59.5,78.9],[55.6,77.6],[51.7,76.6],[47.7,75.8],[43.7,75.4],[39.7,75.2],[35.6,75.3],[31.6,75.7],[27.6,76.3],[23.7,77.3],[19.8,78.5],[16.0,79.9],[12.4,81.7],[8.9,83.7],[5.5,86.0],[2.2,88.3]]
+      ]},
+      { ch: 'ג', strokes: [
+        [[56.2,12.0],[56.2,16.1],[56.2,20.2],[56.2,24.3],[56.0,28.4],[55.1,32.3],[51.7,34.3],[47.7,33.8],[43.7,32.7],[39.8,31.5],[35.8,30.6],[31.7,30.2],[27.6,30.2],[23.6,30.8],[19.7,32.0],[16.0,33.7],[12.5,35.9],[9.5,38.6],[6.7,41.7],[4.4,45.0],[2.5,48.7],[1.3,52.6],[0.6,56.6],[0.4,60.7],[0.8,64.8],[1.8,68.8],[3.3,72.6],[5.3,76.1],[7.8,79.3],[10.8,82.2],[14.1,84.6],[17.6,86.6],[21.5,88.0],[25.5,89.0],[29.5,89.3],[33.6,89.1],[37.6,88.4],[41.5,87.1],[45.2,85.4],[48.7,83.1],[51.7,80.4],[54.5,77.4]]
+      ]},
+      { ch: 'ד', strokes: [
+        [[1.0,15.6],[3.8,14.2],[6.6,13.1],[9.4,12.0],[12.4,11.2],[15.3,10.5],[18.4,10.1],[21.4,10.0],[24.5,10.2],[27.5,10.7],[30.4,11.5],[33.2,12.7],[35.8,14.3],[38.2,16.2],[40.3,18.4],[42.1,20.9],[43.6,23.6],[44.7,26.4],[45.6,29.3],[46.0,32.3],[46.1,35.4],[45.8,38.4],[45.1,41.4],[43.8,44.2],[42.3,46.8],[40.5,49.3],[38.5,51.5],[36.1,53.5],[33.4,54.9],[30.4,55.5],[27.4,55.1],[24.7,53.7],[22.6,51.5],[21.6,48.7],[22.5,45.8],[25.0,44.2],[28.0,43.6],[31.0,44.0],[33.6,45.6],[35.5,48.0],[36.9,50.7],[37.8,53.6],[38.5,56.6],[39.0,59.6],[39.3,62.6],[39.4,65.7],[39.5,68.7],[39.5,71.8],[39.4,74.8],[39.2,77.9],[39.0,80.9],[38.7,83.9],[38.3,87.0],[37.9,90.0]]
+      ]},
+      { ch: 'ה', strokes: [
+        [[2.2,16.3],[5.8,14.5],[9.6,13.0],[13.4,11.9],[17.4,11.1],[21.3,10.7],[25.4,10.5],[29.4,10.7],[33.3,11.1],[37.3,12.0],[41.1,13.2],[44.8,14.8],[48.2,16.8],[51.4,19.3],[54.2,22.1],[56.7,25.2],[58.8,28.7],[60.4,32.3],[61.7,36.1],[62.6,40.1],[63.1,44.0],[63.4,48.0],[63.6,52.0],[63.4,56.0],[63.1,60.1],[62.7,64.0],[62.1,68.0],[61.4,72.0],[60.6,75.9],[59.6,79.8],[58.5,83.6],[57.3,87.5]],
+        [[4.4,44.2],[8.5,44.1],[12.5,44.5],[16.5,45.5],[20.2,47.1],[23.5,49.4],[26.3,52.4],[28.4,55.8],[29.8,59.6],[30.5,63.6],[30.7,67.7],[30.5,71.8],[30.0,75.8],[29.2,79.8],[28.0,83.6],[26.6,87.5]]
+      ]},
+      { ch: 'ו', strokes: [
+        [[0.0,13.6],[0.0,17.7],[0.0,21.7],[0.0,25.7],[0.0,29.8],[0.0,33.8],[0.0,37.9],[0.0,41.9],[0.0,46.0],[0.0,50.0],[0.0,54.0],[0.0,58.1],[0.0,62.1],[0.0,66.2],[0.0,70.2],[0.0,74.3],[0.0,78.3],[0.0,82.3],[0.0,86.4]]
+      ]},
+      { ch: 'ז', strokes: [
+        [[0.5,12.5],[0.5,16.6],[0.5,20.7],[0.5,24.8],[0.7,28.9],[1.7,32.8],[5.2,34.5],[9.2,33.8],[13.1,32.7],[17.0,31.5],[21.0,30.6],[25.1,30.2],[29.2,30.2],[33.2,30.8],[37.1,32.0],[40.9,33.6],[44.3,35.8],[47.4,38.5],[50.1,41.6],[52.3,45.0],[54.1,48.7],[55.3,52.6],[55.9,56.6],[56.0,60.7],[55.7,64.8],[54.8,68.7],[53.4,72.6],[51.4,76.1],[48.9,79.4],[46.0,82.3],[42.7,84.7],[39.1,86.6],[35.3,88.1],[31.3,89.0],[27.3,89.4],[23.2,89.1],[19.2,88.4],[15.3,87.1],[11.6,85.4],[8.2,83.1],[5.2,80.4],[2.4,77.4]]
+      ]},
+      { ch: 'ח', strokes: [
+        [[4.9,16.0],[8.9,15.8],[12.9,15.5],[16.9,15.3],[20.9,15.2],[24.9,15.1],[28.9,15.3],[32.9,15.6],[36.9,16.1],[40.8,16.9],[44.6,18.0],[48.4,19.5],[51.9,21.3],[55.3,23.5],[58.3,26.1],[61.0,29.0],[63.3,32.3],[65.2,35.8],[66.8,39.5],[67.9,43.3],[68.8,47.2],[69.3,51.2],[69.6,55.2],[69.7,59.2],[69.6,63.2],[69.5,67.2],[69.1,71.1],[68.5,75.1],[67.8,79.1],[67.1,83.0],[66.3,86.9]],
+        [[0.5,11.4],[0.5,15.5],[0.5,19.5],[0.5,23.5],[0.5,27.6],[0.5,31.6],[0.5,35.6],[0.5,39.6],[0.5,43.7],[0.5,47.7],[0.5,51.7],[0.5,55.8],[0.5,59.8],[0.5,63.8],[0.5,67.8],[0.5,71.9],[0.5,75.9],[0.5,79.9],[0.5,84.0],[0.5,88.0]]
+      ]},
+      { ch: 'ט', strokes: [
+        [[61.5,-28.4],[58.3,-26.0],[55.1,-23.6],[52.0,-21.1],[48.8,-18.7],[45.7,-16.2],[42.6,-13.7],[39.5,-11.1],[36.4,-8.5],[33.4,-5.9],[30.4,-3.2],[27.5,-0.4],[24.7,2.4],[21.9,5.3],[19.2,8.2],[16.6,11.3],[14.2,14.4],[11.8,17.7],[9.7,21.0],[7.7,24.5],[6.0,28.1],[4.4,31.8],[3.2,35.6],[2.1,39.5],[1.3,43.4],[0.8,47.4],[0.4,51.4],[0.2,55.4],[0.5,59.4],[1.0,63.3],[1.9,67.2],[3.2,71.0],[4.9,74.6],[7.1,78.0],[9.8,80.9],[12.8,83.5],[16.2,85.6],[19.9,87.2],[23.7,88.3],[27.7,89.1],[31.7,89.4],[35.7,89.3],[39.6,88.7],[43.4,87.6],[47.1,85.9],[50.4,83.6],[53.2,80.8],[55.6,77.6],[57.5,74.0],[59.0,70.3],[60.1,66.5],[60.8,62.6],[61.4,58.6],[61.7,54.6],[62.0,50.6],[62.2,46.6]]
+      ]},
+      { ch: 'י', strokes: [
+        [[0.0,13.6],[0.0,17.9],[0.0,22.2],[0.0,26.5],[0.0,30.8],[0.0,35.1],[0.0,39.4]]
+      ]},
+      { ch: 'כ', strokes: [
+        [[2.2,23.7],[5.2,20.9],[8.4,18.4],[11.7,16.0],[15.2,14.0],[19.0,12.4],[22.9,11.2],[26.9,10.4],[30.9,10.0],[35.0,9.9],[39.0,10.2],[43.1,10.8],[47.0,11.7],[50.9,12.9],[54.7,14.5],[58.3,16.3],[61.7,18.6],[64.9,21.1],[67.8,23.9],[70.4,27.0],[72.7,30.4],[74.5,34.0],[75.9,37.9],[76.9,41.8],[77.4,45.9],[77.6,49.9],[77.4,54.0],[76.7,58.0],[75.7,61.9],[74.4,65.8],[72.7,69.5],[70.5,72.9],[68.0,76.1],[65.2,79.1],[62.1,81.7],[58.7,83.9],[55.1,85.8],[51.3,87.3],[47.4,88.4],[43.4,89.1],[39.4,89.6],[35.3,89.9],[31.2,90.1],[27.2,90.0],[23.1,89.8],[19.0,89.6],[15.0,89.5],[10.9,89.2],[6.8,89.0],[2.8,88.5]]
+      ]},
+      { ch: 'ך', strokes: [
+        [[2.0,23.7],[4.9,20.8],[8.0,18.2],[11.3,15.8],[14.8,13.8],[18.5,12.2],[22.4,11.0],[26.4,10.1],[30.4,9.7],[34.5,9.7],[38.5,10.2],[42.5,11.0],[46.4,12.2],[50.1,13.8],[53.6,15.9],[56.9,18.3],[59.9,21.0],[62.7,23.9],[65.1,27.2],[67.2,30.7],[69.0,34.3],[70.3,38.2],[71.2,42.1],[71.7,46.2],[71.8,50.2],[71.6,54.3],[71.0,58.3],[70.0,62.2],[68.6,66.0],[66.8,69.7],[64.6,73.1],[62.0,76.3],[59.2,79.2],[56.1,81.8],[52.7,84.0],[49.1,85.9],[45.3,87.4],[41.4,88.4],[37.4,89.1],[33.3,89.5],[29.3,89.4],[25.2,88.9],[21.3,88.0],[17.4,86.7],[13.6,85.3],[9.7,84.0],[5.8,83.1],[1.9,83.7],[0.3,87.4],[0.0,91.4],[0.0,95.5],[0.0,99.5],[0.0,103.6],[0.0,107.7],[0.0,111.7],[0.0,115.8],[0.0,119.9],[0.0,123.9],[0.0,128.0]]
+      ]},
+      { ch: 'ל', strokes: [
+        [[60.7,-24.3],[57.6,-26.8],[54.1,-28.7],[50.2,-29.8],[46.2,-29.8],[42.3,-28.9],[38.8,-27.0],[36.0,-24.2],[33.9,-20.7],[32.7,-16.9],[32.2,-13.0],[32.0,-9.0],[31.9,-4.9],[31.9,-0.9],[31.9,3.1],[31.9,7.1],[31.9,11.1],[31.9,15.1],[31.9,19.1],[31.9,23.1],[31.9,27.1],[31.9,31.1],[31.9,35.1],[31.8,39.2],[31.7,43.2],[31.7,47.2],[31.8,51.2],[31.9,55.2],[31.9,59.2],[31.9,63.2],[31.8,67.2],[31.6,71.2],[31.0,75.2],[30.0,79.0],[28.2,82.6],[25.5,85.6],[22.1,87.7],[18.3,88.8],[14.3,89.0],[10.4,88.1],[6.8,86.2],[3.9,83.5],[1.8,80.1],[0.7,76.3],[0.6,72.3],[1.5,68.4],[3.4,64.9],[6.0,61.8],[8.9,59.1],[12.0,56.5],[15.1,54.0],[18.4,51.7],[22.0,49.8],[25.7,48.5],[29.7,47.7]]
+      ]},
+      { ch: 'מ', strokes: [
+        [[68.7,10.0],[67.8,12.9],[67.0,15.8],[66.2,18.7],[65.5,21.7],[64.9,24.6],[64.3,27.6],[63.7,30.6],[63.1,33.6],[62.6,36.5],[62.1,39.5],[61.7,42.5],[61.2,45.5],[60.8,48.5],[60.4,51.5],[60.1,54.5],[59.7,57.5],[59.4,60.5],[59.1,63.5],[58.8,66.6],[58.5,69.6],[58.3,72.6],[58.0,75.6],[57.8,78.6],[57.6,81.7],[57.4,84.7],[57.2,87.7],[56.5,88.7],[54.8,86.2],[53.1,83.7],[51.5,81.2],[49.8,78.6],[48.1,76.1],[46.5,73.6],[44.9,71.0],[43.3,68.4],[41.7,65.9],[40.1,63.3],[38.5,60.7],[37.0,58.1],[35.4,55.5],[33.9,52.9],[32.4,50.3],[30.9,47.6],[29.3,45.0],[27.8,42.4],[26.3,39.8],[24.8,37.2],[23.2,34.6],[21.7,32.0],[20.1,29.4],[18.6,26.8],[17.0,24.2],[15.4,21.6],[13.7,19.1],[12.1,16.5],[10.4,14.0],[9.4,14.9],[8.6,17.9],[8.0,20.8],[7.3,23.8],[6.7,26.8],[6.2,29.7],[5.7,32.7],[5.2,35.7],[4.7,38.7],[4.3,41.7],[3.9,44.7],[3.5,47.7],[3.2,50.7],[2.9,53.7],[2.6,56.7],[2.3,59.8],[2.1,62.8],[1.9,65.8],[1.7,68.8],[1.5,71.8],[1.4,74.9],[1.3,77.9],[1.2,80.9],[1.1,83.9],[1.0,87.0],[1.0,90.0]]
+      ]},
+      { ch: 'ם', strokes: [
+        [[7.4,30.0],[9.6,26.5],[12.3,23.2],[15.2,20.3],[18.5,17.6],[22.0,15.4],[25.7,13.5],[29.6,12.0],[33.7,10.9],[37.8,10.2],[42.0,10.0],[46.2,10.2],[50.3,10.9],[54.4,12.0],[58.3,13.5],[62.0,15.4],[65.5,17.6],[68.8,20.3],[71.7,23.2],[74.4,26.5],[76.6,30.0],[78.5,33.7],[80.0,37.6],[81.1,41.7],[81.8,45.8],[82.0,50.0],[81.8,54.2],[81.1,58.3],[80.0,62.4],[78.5,66.3],[76.6,70.0],[74.4,73.5],[71.7,76.8],[68.8,79.7],[65.5,82.4],[62.0,84.6],[58.3,86.5],[54.4,88.0],[50.3,89.1],[46.2,89.8],[42.0,90.0],[37.8,89.8],[33.7,89.1],[29.6,88.0],[25.7,86.5],[22.0,84.6],[18.5,82.4],[15.2,79.7],[12.3,76.8],[9.6,73.5],[7.4,70.0],[5.5,66.3],[4.0,62.4],[2.9,58.3],[2.2,54.2],[2.0,50.0],[2,47],[2,44],[2,41],[2,38],[2,35],[2,32],[2,29],[2,26],[2,23],[2,20],[2,17],[2,14],[2,11],[2,10],[2,13],[2,16],[2,19],[2,22],[2,25],[2,28],[2,31],[2,34],[2,37],[2,40],[2,43],[2,46],[2,49],[2,52],[2,55],[2,58],[2,61],[2,64],[2,67],[2,70],[2,73],[2,76],[2,79],[2,82],[2,85],[2,88],[2,91],[2,94],[2,97],[2,100],[2,103],[2,106],[2,109],[2,112],[2,115],[2,118],[2,121],[2,124],[2,127],[2,130],[2,133]]
+      ]},
+      { ch: 'נ', strokes: [
+        [[46.7,12.0],[46.9,16.1],[47.0,20.1],[47.0,24.2],[47.0,28.3],[47.0,32.3],[47.0,36.4],[47.0,40.5],[47.0,44.5],[47.0,48.6],[47.0,52.7],[47.0,56.8],[47.0,60.8],[46.9,64.9],[46.8,69.0],[46.4,73.0],[45.7,77.0],[44.3,80.8],[42.0,84.2],[38.9,86.8],[35.2,88.4],[31.2,89.4],[27.2,89.9],[23.1,90.2],[19.1,90.3],[15.0,90.3],[10.9,90.3],[6.9,90.2],[2.8,89.9]]
+      ]},
+      { ch: 'ן', strokes: [
+        [[0.0,13.6],[0.0,17.7],[0.0,21.8],[0.0,25.9],[0.0,30.0],[0.0,34.0],[0.0,38.1],[0.0,42.2],[0.0,46.3],[0.0,50.4],[0.0,54.5],[0.0,58.6],[0.0,62.6],[0.0,66.7],[0.0,70.8],[0.0,74.9],[0.0,79.0],[0.0,83.1],[0.0,87.1],[0.0,91.2],[0.0,95.3],[0.0,99.4],[0.0,103.5],[0.0,107.6],[0.0,111.7],[0.0,115.7],[0.0,119.8],[0.0,123.9],[0.0,128.0]]
+      ]},
+      { ch: 'ס', strokes: [
+        [[32.0,10.0],[26.8,10.6],[21.7,12.4],[17.0,15.4],[12.7,19.4],[9.0,24.3],[6.0,30.0],[3.8,36.3],[2.5,43.1],[2.0,50.0],[2.5,56.9],[3.8,63.7],[6.0,70.0],[9.0,75.7],[12.7,80.6],[17.0,84.6],[21.7,87.6],[26.8,89.4],[32.0,90.0],[37.2,89.4],[42.3,87.6],[47.0,84.6],[51.3,80.6],[55.0,75.7],[58.0,70.0],[60.2,63.7],[61.5,56.9],[62.0,50.0],[61.5,43.1],[60.2,36.3],[58.0,30.0],[55.0,24.3],[51.3,19.4],[47.0,15.4],[42.3,12.4],[37.2,10.6],[32.0,10.0]]
+      ]},
+      { ch: 'ע', strokes: [
+        [[57,9],[46,15],[37,21],[29,28],[20,37],[10,48],[4,62],[5,77],[14,87],[29,90],[44,86],[53,74],[53,58],[45,43],[36,32],[26,23],[14,15],[2,10]]
+      ]},
+      { ch: 'פ', strokes: [
+        [[1.9,23.2],[4.6,20.2],[7.5,17.3],[10.6,14.8],[13.9,12.6],[17.6,10.8],[21.4,9.5],[25.4,8.8],[29.4,8.5],[33.4,8.7],[37.4,9.4],[41.3,10.6],[44.9,12.2],[48.4,14.4],[51.5,16.9],[54.4,19.7],[57.0,22.8],[59.3,26.2],[61.2,29.7],[62.7,33.5],[63.9,37.3],[64.8,41.3],[65.2,45.3],[65.4,49.3],[65.3,53.3],[64.9,57.4],[64.1,61.3],[63.0,65.2],[61.5,68.9],[59.7,72.5],[57.5,75.9],[55.0,79.1],[52.1,81.9],[49.0,84.5],[45.6,86.7],[42.0,88.4],[38.1,89.7],[34.2,90.4],[30.1,90.6],[26.1,90.5],[22.1,89.8],[18.3,88.5],[14.7,86.6],[11.6,84.0],[9.2,80.8],[7.6,77.1],[7.1,73.1],[7.7,69.1],[9.4,65.5],[12.0,62.4],[15.1,59.8],[18.6,57.9],[22.5,56.6],[26.4,55.8],[30.5,55.6],[34.5,55.7]]
+      ]},
+      { ch: 'ף', strokes: [
+        [[12.9,33.0],[9.2,31.3],[5.9,29.0],[3.2,26.1],[1.3,22.5],[0.5,18.5],[0.8,14.5],[2.0,10.7],[4.3,7.4],[7.3,4.7],[11.0,3.0],[14.9,2.1],[18.9,1.6],[22.9,1.3],[27.0,1.1],[31.0,1.1],[35.1,1.1],[39.1,1.1],[43.1,1.0],[47.1,0.6],[51.1,-0.1],[54.9,-1.4],[58.3,-3.6],[60.9,-6.7],[62.5,-10.4],[63.1,-14.4],[62.7,-18.4],[61.3,-22.1],[58.9,-25.4],[55.7,-27.9],[52.0,-29.4],[48.0,-29.9],[44.0,-29.4],[40.3,-27.9],[37.1,-25.5],[34.7,-22.3],[33.1,-18.5],[32.3,-14.6],[32.0,-10.6],[31.9,-6.5],[31.9,-2.5],[31.9,1.6],[31.9,5.6],[31.9,9.6],[31.9,13.7],[31.9,17.7],[31.9,21.7],[31.9,25.8],[31.9,29.8],[31.9,33.9],[31.9,37.9],[31.9,41.9],[31.9,46.0],[31.9,50.0],[31.9,54.0],[31.9,58.1],[31.9,62.1],[31.8,66.2],[31.7,70.2],[31.2,74.2],[30.3,78.1],[28.7,81.8],[26.2,85.0],[22.9,87.3],[19.1,88.7],[15.1,89.0],[11.1,88.3],[7.5,86.6],[4.4,84.1],[2.1,80.8],[0.8,76.9],[0.5,72.9],[1.3,69.0],[3.1,65.4],[5.8,62.4],[9.1,60.1],[12.8,58.5],[16.6,57.2],[20.6,56.3],[24.5,55.6],[28.6,55.2]]
+      ]},
+      { ch: 'צ', strokes: [
+        [[2.6,16.4],[5.9,14.1],[9.5,12.3],[13.4,11.0],[17.4,10.2],[21.4,9.7],[25.5,9.6],[29.5,10.0],[33.5,11.0],[37.2,12.5],[40.6,14.7],[43.5,17.5],[45.7,20.9],[47.1,24.8],[47.6,28.8],[47.1,32.8],[45.7,36.6],[43.6,40.1],[41.1,43.4],[39.2,46.9],[39.3,50.9],[41.4,54.3],[44.2,57.3],[46.9,60.3],[49.2,63.7],[50.7,67.5],[51.1,71.5],[50.3,75.5],[48.5,79.1],[45.8,82.1],[42.5,84.5],[38.9,86.4],[35.1,87.8],[31.2,88.8],[27.2,89.6],[23.1,90.1],[19.1,90.4],[15.0,90.5],[10.9,90.5],[6.9,90.4],[2.8,90.3]]
+      ]},
+      { ch: 'ץ', strokes: [
+        [[0.3,-7.5],[1.4,-3.6],[3.0,0.2],[5.1,3.6],[7.8,6.6],[10.8,9.3],[14.2,11.5],[17.9,13.2],[21.8,14.3],[25.8,15.0],[29.8,15.4],[33.9,15.5],[37.9,15.2],[41.9,14.6],[45.8,13.6],[49.6,12.0],[53.1,10.0],[56.2,7.4],[58.9,4.4],[61.2,1.1],[62.8,-2.6],[63.6,-6.6],[63.7,-10.6],[62.8,-14.6],[60.9,-18.2],[58.1,-21.1],[54.7,-23.2],[50.8,-24.3],[46.7,-24.3],[42.8,-23.3],[39.3,-21.3],[36.5,-18.4],[34.4,-15.0],[33.2,-11.1],[32.7,-7.1],[32.5,-3.1],[32.4,1.0],[32.4,5.1],[32.4,9.1],[32.4,13.2],[32.4,17.2],[32.4,21.3],[32.4,25.3],[32.4,29.4],[32.4,33.4],[32.4,37.5],[32.4,41.5],[32.4,45.6],[32.4,49.6],[32.4,53.7],[32.4,57.7],[32.4,61.8],[32.3,65.8],[32.2,69.9],[31.8,73.9],[30.9,77.9],[29.4,81.6],[26.9,84.8],[23.7,87.2],[19.9,88.6],[15.9,89.0],[11.9,88.4],[8.2,86.7],[5.0,84.2],[2.7,80.9],[1.4,77.1],[1.0,73.1],[1.8,69.1],[3.6,65.5],[6.3,62.5],[9.6,60.2],[13.3,58.5],[17.1,57.2],[21.1,56.3],[25.1,55.6],[29.1,55.2]]
+      ]},
+      { ch: 'ק', strokes: [
+        [[3.3,15.3],[7.4,14.7],[11.5,14.4],[15.6,14.2],[19.7,14.1],[23.8,14.2],[27.8,14.4],[31.9,14.8],[36.0,15.5],[39.9,16.5],[43.8,17.9],[47.5,19.7],[50.8,22.0],[53.8,24.9],[56.2,28.2],[58.0,31.8],[59.1,35.8],[59.7,39.8],[59.8,43.9],[59.6,48.0],[59.0,52.1],[58.2,56.1],[57.1,60.0],[55.9,63.9],[54.4,67.8],[53.0,71.6],[51.4,75.4],[49.7,79.1],[47.8,82.8],[45.9,86.4]],
+        [[0.3,47.6],[0.1,51.8],[0.0,56.0],[0.0,60.2],[0.0,64.3],[0.0,68.5],[0.0,72.7],[0.0,76.8],[0.0,81.0],[0.0,85.2],[0.0,89.4],[0.0,93.5],[0.0,97.7],[0.0,101.9],[0.0,106.0],[0.0,110.2],[0.0,114.4],[0.0,118.6],[0.0,122.7],[0.0,126.9]]
+      ]},
+      { ch: 'ר', strokes: [
+        [[2.8,17.0],[6.8,16.4],[10.8,15.9],[14.8,15.5],[18.8,15.2],[22.8,15.1],[26.8,15.2],[30.8,15.5],[34.8,15.9],[38.7,16.7],[42.6,17.7],[46.3,19.2],[49.9,21.0],[53.1,23.4],[56.1,26.1],[58.6,29.2],[60.6,32.7],[62.2,36.3],[63.4,40.2],[64.2,44.1],[64.7,48.1],[64.8,52.1],[64.8,56.1],[64.5,60.1],[64.0,64.1],[63.4,68.1],[62.7,72.0],[61.8,75.9],[60.9,79.8],[59.7,83.7],[58.4,87.5]]
+      ]},
+      { ch: 'ש', strokes: [
+        [[8,60],[20,58],[33,55],[46,49],[57,41],[64,31],[64,20],[56,12],[44,9],[30,11],[18,18],[9,30],[5,44],[6,58],[9,70],[16,81],[27,88],[40,90],[52,86],[61,78],[65,70]]
+      ]},
+      { ch: 'ת', strokes: [
+        [[26.6,16.0],[30.7,15.7],[34.9,15.5],[39.0,15.3],[43.1,15.2],[47.2,15.3],[51.4,15.8],[55.4,16.5],[59.4,17.6],[63.2,19.3],[66.7,21.5],[69.8,24.2],[72.4,27.4],[74.5,30.9],[76.1,34.8],[77.2,38.7],[77.9,42.8],[78.3,46.9],[78.4,51.1],[78.2,55.2],[77.9,59.3],[77.4,63.4],[76.7,67.5],[75.9,71.6],[75.1,75.6],[74.1,79.6],[72.9,83.6],[71.6,87.5]],
+        [[23.0,11.4],[22.8,15.5],[22.7,19.6],[22.7,23.7],[22.7,27.8],[22.7,31.9],[22.7,36.0],[22.7,40.1],[22.7,44.3],[22.7,48.4],[22.7,52.5],[22.7,56.6],[22.7,60.7],[22.7,64.8],[22.6,68.9],[22.2,72.9],[21.5,77.0],[20.1,80.8],[17.8,84.2],[14.6,86.8],[10.9,88.5],[6.9,89.4],[2.8,89.7]]
+      ]}
+    ];
+
+    function vfSmooth(ctrl) {
+        if (ctrl.length < 3) return ctrl.slice();
+        const out = [], P = [ctrl[0], ...ctrl, ctrl[ctrl.length - 1]];
+        for (let i = 1; i < P.length - 2; i++) {
+            const p0 = P[i - 1], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2];
+            for (let tt = 0; tt < 1; tt += 1 / 12) {
+                const t2 = tt * tt, t3 = t2 * tt;
+                const f = k => 0.5 * ((2 * p1[k]) + (-p0[k] + p2[k]) * tt + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3);
+                out.push([f(0), f(1)]);
+            }
+        }
+        out.push(ctrl[ctrl.length - 1]);
+        return out;
+    }
+    function vfResample(pts, step) {
+        const out = [pts[0]];
+        let prev = pts[0], carry = 0;
+        for (let i = 1; i < pts.length; i++) {
+            const cur = pts[i];
+            let seg = Math.hypot(cur[0] - prev[0], cur[1] - prev[1]);
+            while (carry + seg >= step) {
+                const r = (step - carry) / seg;
+                const np = [prev[0] + (cur[0] - prev[0]) * r, prev[1] + (cur[1] - prev[1]) * r];
+                out.push(np); prev = np; seg = Math.hypot(cur[0] - prev[0], cur[1] - prev[1]); carry = 0;
+            }
+            carry += seg; prev = cur;
+        }
+        const last = pts[pts.length - 1], tail = out[out.length - 1];
+        if (Math.hypot(last[0] - tail[0], last[1] - tail[1]) > 0.3) out.push(last);
+        return out;
+    }
+    const VF = {};
+    VF_RAW.forEach(L => {
+        L.paths = L.strokes.map(s => vfResample(vfSmooth(s), 1));
+        // נקודות שבהן המסלול חוזר על עצמו (למשל למעלה ואז למטה לאורך אותו קו)
+        L.cusps = L.paths.map(p => {
+            const c = [];
+            for (let k = 3; k < p.length - 3; k++) {
+                const ax = p[k][0] - p[k - 3][0], ay = p[k][1] - p[k - 3][1], bx = p[k + 3][0] - p[k][0], by = p[k + 3][1] - p[k][1];
+                const dot = (ax * bx + ay * by) / (Math.hypot(ax, ay) * Math.hypot(bx, by) || 1);
+                if (dot < -0.3) c.push(k);
+            }
+            return c;
+        });
+        let x0 = 1e9, x1 = -1e9;
+        L.paths.forEach(p => p.forEach(q => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); }));
+        L.box = { x0: x0, w: x1 - x0 };
+        L.slotW = Math.max(L.box.w, 24); // אותיות צרות (ו, י) מקבלות רוחב מינימלי
+        VF[L.ch] = L;
+    });
+
+    const VF_Y_TOP = -35, VF_Y_SPAN = 170;       // טווח האנכי של האותיות, כולל עולות ויורדות
+    const VF_LETTER_GAP = 16, VF_WORD_GAP = 46;   // רווחים ביחידות
+    const VF_COLORS = { faded: '#cfe3f7', lit: '#1e88e5', arrow: '#ff9800', rule: '#e3eef9' };
+    let vf = null, vfRaf = 0;
+    const vfCv = document.getElementById('vfCanvas');
+    const vfCtx = vfCv.getContext('2d');
+
+    // מפרק משפט למילים, ומשאיר רק אותיות שיש להן מסלול (פיסוק, ניקוד וספרות לא מוצגים)
+    function vfWordsOf(text) {
+        return String(text || '').split(/\s+/).map(w => Array.from(w).filter(ch => VF[ch]).map(ch => VF[ch])).filter(w => w.length);
+    }
+    function vfAreaHeight() { return Math.max(210, Math.min(300, Math.round(window.innerHeight * 0.38))); }
+
+    function vfStart(scene) {
+        const words = vfWordsOf(scene.text).map(letters => ({
+            letters: letters,
+            units: letters.reduce((a, L) => a + L.slotW, 0) + VF_LETTER_GAP * (letters.length - 1)
+        }));
+        vf = { words: words, wi: 0, ci: 0, si: 0, prog: 0, dragging: false, wait: false, lineStart: 0, demo: null, done: false, S: 1, W: 0, H: 0, pos: [] };
+        const area = document.getElementById('notebookArea');
+        area.style.height = vfAreaHeight() + 'px';
+        vfCv.classList.remove('hidden');
+        vfLayout();
+        vfLoop();
+    }
+    function vfStop() {
+        if (vfRaf) { cancelAnimationFrame(vfRaf); vfRaf = 0; }
+        vfCv.classList.add('hidden');
+        vf = null;
+    }
+    function vfActive() { return !!vf && !vfCv.classList.contains('hidden'); }
+
+    // מחשב גודל ומיקום. הגודל קבוע לכל המשפט (האות הארוכה ביותר קובעת אם צריך להקטין)
+    function vfLayout() {
+        if (!vf) return;
+        const area = document.getElementById('notebookArea');
+        const DPR = Math.min(window.devicePixelRatio || 1, 2);
+        vf.W = area.clientWidth || 800;
+        vf.H = parseInt(area.style.height, 10) || area.clientHeight || 230;
+        vfCv.width = Math.round(vf.W * DPR); vfCv.height = Math.round(vf.H * DPR);
+        vf.DPR = DPR;
+        let S = (vf.H - 20) / VF_Y_SPAN;
+        const availW = vf.W - 24;
+        const maxUnits = Math.max.apply(null, vf.words.map(w => w.units));
+        if (maxUnits * S > availW) S = availW / maxUnits;
+        vf.S = S;
+        vfPlaceLine();
+    }
+    // קובע אילו מילים מוצגות עכשיו על השורה ואת מיקום כל אות (מימין לשמאל)
+    function vfPlaceLine() {
+        const S = vf.S, availW = vf.W - 24;
+        // אם המילה הנוכחית לא נכנסת אחרי המילים שכבר מוצגות, מנקים את השורה
+        let used = 0;
+        for (let k = vf.lineStart; k < vf.wi; k++) used += vf.words[k].units * S + VF_WORD_GAP * S;
+        if (vf.wi > vf.lineStart && used + vf.words[vf.wi].units * S > availW) vf.lineStart = vf.wi;
+        vf.pos = [];
+        let right = vf.W - 12;
+        for (let k = vf.lineStart; k <= vf.wi; k++) {
+            const w = vf.words[k];
+            let cursor = right;
+            const letters = w.letters.map(L => {
+                const slotLeft = cursor - L.slotW * S;
+                const ox = slotLeft + ((L.slotW - L.box.w) / 2 - L.box.x0) * S;
+                cursor = slotLeft - VF_LETTER_GAP * S;
+                return { L: L, ox: ox };
+            });
+            vf.pos[k] = letters;
+            right -= w.units * S + VF_WORD_GAP * S;
+        }
+    }
+    const vfX = (p, ox) => ox + p[0] * vf.S;
+    const vfY = (p) => 10 + (p[1] - VF_Y_TOP) * vf.S;
+
+    function vfStrokePath(path, ox, from, to, color, width) {
+        if (to - from < 1) return;
+        vfCtx.beginPath();
+        vfCtx.moveTo(vfX(path[from], ox), vfY(path[from]));
+        for (let k = from + 1; k <= to; k++) vfCtx.lineTo(vfX(path[k], ox), vfY(path[k]));
+        vfCtx.strokeStyle = color; vfCtx.lineWidth = width; vfCtx.lineCap = 'round'; vfCtx.lineJoin = 'round';
+        vfCtx.stroke();
+    }
+    function vfArrow(path, ox, k, pulse, t) {
+        const kk = Math.max(0, Math.min(k, path.length - 1));
+        const a = path[kk];
+        const b = path[Math.min(kk + 6, path.length - 1)], c = path[Math.max(kk - 6, 0)];
+        const ang = Math.atan2(b[1] - c[1], b[0] - c[0]);
+        const x = vfX(a, ox), y = vfY(a), r = 13;
+        if (pulse) {
+            vfCtx.beginPath(); vfCtx.arc(x, y, r * (1.35 + 0.15 * Math.sin(t / 220)), 0, 7);
+            vfCtx.strokeStyle = 'rgba(255,152,0,.45)'; vfCtx.lineWidth = 2; vfCtx.stroke();
+        }
+        vfCtx.save(); vfCtx.translate(x, y); vfCtx.rotate(ang);
+        vfCtx.beginPath(); vfCtx.moveTo(r, 0); vfCtx.lineTo(-r * 0.75, -r * 0.8); vfCtx.lineTo(-r * 0.3, 0); vfCtx.lineTo(-r * 0.75, r * 0.8); vfCtx.closePath();
+        vfCtx.fillStyle = VF_COLORS.arrow; vfCtx.fill();
+        vfCtx.lineWidth = 2; vfCtx.strokeStyle = '#fff'; vfCtx.stroke();
+        vfCtx.restore();
+    }
+
+    function vfDraw(t) {
+        if (!vf) return;
+        const S = vf.S, trackW = Math.max(8, 11 * S);
+        vfCtx.setTransform(vf.DPR, 0, 0, vf.DPR, 0, 0);
+        vfCtx.clearRect(0, 0, vf.W, vf.H);
+        // קו כתיבה עדין בגובה שורת הבסיס של האותיות
+        const by = vfY([0, 90]);
+        vfCtx.beginPath(); vfCtx.moveTo(0, by); vfCtx.lineTo(vf.W, by); vfCtx.strokeStyle = VF_COLORS.rule; vfCtx.lineWidth = 3; vfCtx.stroke();
+        for (let k = vf.lineStart; k <= vf.wi; k++) {
+            vf.pos[k].forEach((lp, j) => {
+                const wordDone = k < vf.wi || vf.done;
+                const letterDone = wordDone || j < vf.ci;
+                const letterCur = !wordDone && k === vf.wi && j === vf.ci;
+                lp.L.paths.forEach((path, s) => {
+                    vfStrokePath(path, lp.ox, 0, path.length - 1, VF_COLORS.faded, trackW);
+                    if (letterDone || (letterCur && s < vf.si)) vfStrokePath(path, lp.ox, 0, path.length - 1, VF_COLORS.lit, trackW);
+                    else if (letterCur && s === vf.si) vfStrokePath(path, lp.ox, 0, vf.prog, VF_COLORS.lit, trackW);
+                });
+            });
+        }
+        if (!vf.done && !vf.wait) {
+            const lp = vf.pos[vf.wi][vf.ci], path = lp.L.paths[vf.si];
+            if (vf.demo) {
+                vfStrokePath(path, lp.ox, 0, Math.floor(vf.demo.i), 'rgba(255,152,0,.5)', trackW * 0.5);
+                vfArrow(path, lp.ox, Math.floor(vf.demo.i), false, t);
+                vf.demo.i += Math.max(0.5, 2.4 / S);
+                if (vf.demo.i >= path.length - 1) vf.demo = null;
+            } else {
+                vfArrow(path, lp.ox, vf.prog, !vf.dragging, t);
+            }
+        }
+    }
+    function vfLoop() {
+        if (vfRaf) cancelAnimationFrame(vfRaf);
+        const step = (t) => {
+            if (!vf || currentMode !== 'game') { vfRaf = 0; return; }
+            vfDraw(t);
+            vfRaf = requestAnimationFrame(step);
+        };
+        vfRaf = requestAnimationFrame(step);
+    }
+
+    // קלט: נקודה בפיקסלים יחסית לקנבס. START_TOL וגם TOL בפיקסלים כדי שיהיה נוח לאצבע
+    function vfPointer(type, px, py) {
+        if (!vf || vf.done || vf.wait || vf.demo) return;
+        const lp = vf.pos[vf.wi][vf.ci], path = lp.L.paths[vf.si], S = vf.S;
+        const ux = (px - lp.ox) / S, uy = (py - 10) / S + VF_Y_TOP;
+        const dist = (a) => Math.hypot(a[0] - ux, a[1] - uy) * S;
+        if (type === 'down') {
+            if (dist(path[vf.prog]) < 46) vf.dragging = true;
+            return;
+        }
+        if (type === 'up') { vf.dragging = false; return; }
+        if (!vf.dragging) return;
+        // מתקדמים לנקודה הקרובה ביותר לאצבע, ולא רחוק יותר מהפנייה הבאה (כדי שלא לדלג על לולאות וקווים חוזרים)
+        let best = -1, bestD = Math.min(40, dist(path[vf.prog]) + 0.01);
+        const cusp = lp.L.cusps[vf.si].find(c => c > vf.prog);
+        const look = Math.max(8, Math.round(28 / S));
+        const limit = Math.min(vf.prog + look, path.length - 1, cusp === undefined ? Infinity : cusp);
+        for (let j = vf.prog + 1; j <= limit; j++) {
+            const d = dist(path[j]);
+            if (d < bestD) { bestD = d; best = j; }
+        }
+        if (best > vf.prog) {
+            vf.prog = best;
+            if (vf.prog >= path.length - 2) vfFinishStroke();
+        }
+    }
+    function vfFinishStroke() {
+        vf.dragging = false;
+        const lp = vf.pos[vf.wi][vf.ci];
+        if (vf.si < lp.L.paths.length - 1) { vf.si++; vf.prog = 0; return; }
+        vf.si = 0; vf.prog = 0; vf.ci++;
+        if (vf.ci < vf.words[vf.wi].letters.length) return;
+        // סיימנו מילה
+        if (vf.wi < vf.words.length - 1) {
+            vf.wait = true;
+            setTimeout(() => {
+                if (!vf) return;
+                vf.wi++; vf.ci = 0; vf.wait = false;
+                vfPlaceLine();
+            }, 600);
+            return;
+        }
+        // סיימנו את כל המשפט
+        vf.done = true;
+        vf.wait = true;
+        vfDraw(performance.now());
+        recordAttempt({ ok: true, img: captureCanvasImage(vfCv) });
+        finishRecord('correct');
+        setTimeout(() => { if (vf) rewardAndPlayFullVideo(); }, 500);
+    }
+    // רמז: החץ מראה את הקו הנוכחי. לחיצה נוספת עוצרת
+    function vfHint() {
+        if (!vf || vf.done || vf.wait) return;
+        if (vf.demo) { vf.demo = null; return; }
+        vf.demo = { i: 0 };
+        vf.dragging = false;
+        if (currentRecord) { currentRecord.hints++; saveRecord(); }
+    }
+    function vfReset() {
+        if (!vf || vf.done) return;
+        vf.wi = 0; vf.ci = 0; vf.si = 0; vf.prog = 0; vf.lineStart = 0; vf.dragging = false; vf.wait = false; vf.demo = null;
+        vfPlaceLine();
+    }
+    (function initVfEvents() {
+        const rel = e => { const r = vfCv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+        vfCv.addEventListener('pointerdown', e => { e.preventDefault(); try { vfCv.setPointerCapture(e.pointerId); } catch (x) {} const p = rel(e); vfPointer('down', p[0], p[1]); });
+        vfCv.addEventListener('pointermove', e => { e.preventDefault(); const p = rel(e); vfPointer('move', p[0], p[1]); });
+        const up = e => { vfPointer('up', 0, 0); };
+        vfCv.addEventListener('pointerup', up);
+        vfCv.addEventListener('pointercancel', up);
+    })();
 
     // [תיקון 2] כשהדף נטען: ממלאים את רשימת הפרויקטים ומנסים לטעון את הפרויקט האחרון.
     // (הטעינה בפועל תתבצע רק כשגם נגן היוטיוב מוכן.)
