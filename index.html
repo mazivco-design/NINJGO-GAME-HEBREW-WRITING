@@ -2652,6 +2652,7 @@
     function parseCorrections(text) {
         const pairs = [];
         text.split('\n').forEach(line => {
+            if (line.trim().startsWith('#')) return; // [תיקון 41] שורת כותרת במילון
             const i = line.indexOf('=');
             if (i <= 0) return;
             const wrong = line.slice(0, i).trim();
@@ -2667,9 +2668,10 @@
         const map = {};
         pairs.forEach(pr => { map[pr[0]] = pr[1]; });
         const keys = Object.keys(map).sort((a, b) => b.length - a.length).map(escapeRegex);
-        const re = new RegExp('(^|[^\\u05D0-\\u05EA])(' + keys.join('|') + ')(?=[^\\u05D0-\\u05EA]|$)', 'g');
+        // [תיקון 41] אותיות שימוש (ו, ה, ב, ל, מ, ש, כ וצירופיהן) לפני המילה נשמרות: "ללואיד" -> "ללויד"
+        const re = new RegExp('(^|[^\\u05D0-\\u05EA])(ו?(?:כש|שה|שב|של|שמ|ה|ב|ל|מ|ש|כ)?)(' + keys.join('|') + ')(?=[^\\u05D0-\\u05EA]|$)', 'g');
         let count = 0;
-        const out = text.replace(re, (m, pre, word) => { count++; return pre + map[word]; });
+        const out = text.replace(re, (m, pre, prefix, word) => { count++; return pre + prefix + map[word]; });
         return { text: out, count: count };
     }
     function saveAndApplyCorrections() {
@@ -3861,8 +3863,28 @@
     // [תיקון 2] כשהדף נטען: ממלאים את רשימת הפרויקטים ומנסים לטעון את הפרויקט האחרון.
     // (הטעינה בפועל תתבצע רק כשגם נגן היוטיוב מוכן.)
     window.addEventListener('orientationchange', () => { setTimeout(syncCanvasSize, 300); });
+    // [תיקון 41] מילון שמות ומושגים של נינג'גו: נוסף פעם אחת למילון התיקונים (אפשר לערוך או למחוק שורות בלשונית הכתוביות)
+    const NINJAGO_DICT_VERSION = 'ninjagoDictV1';
+    const NINJAGO_DICT = [
+        '# שמות דמויות', 'לואיד=לויד', 'זאן=זיין', 'מסטר=מאסטר', 'מסטרים=מאסטרים', 'סקיילר=סקיילור', 'טורנר=טרנר',
+        '# מושגים', 'תורניר=טורניר', 'הנינג\'ר=הנינג\'ה', 'נינג\'ר=נינג\'ה',
+        '# שיבושי תמלול', 'העובדן=האובדן', 'עובדן=אובדן', 'ההזכרה=ההיעלמות', 'מצרח=מצרך', 'אוגיות=עוגיות', 'הוגיעת=עוגיית', 'ההוגיעה=העוגייה', 'הוגיעה=עוגייה',
+        'מקודת=מלכודת', 'מולכודת=מלכודת', 'היתריות=איטריות', 'יתריות=איטריות', 'סליטר ביט=סלית\'רפיט', 'סטיליטר ביטס=סלית\'רפיט'
+    ];
+    function seedNinjagoDict() {
+        try {
+            if (localStorage.getItem(NINJAGO_DICT_VERSION)) return;
+            const cur = loadCorrectionsText().split('\n').map(x => x.trim()).filter(Boolean);
+            const have = new Set(cur.map(l => l.split('=')[0].trim()));
+            NINJAGO_DICT.forEach(l => { const k = l.split('=')[0].trim(); if (l.startsWith('#') ? !cur.includes(l) : !have.has(k)) cur.push(l); });
+            localStorage.setItem(CORRECTIONS_KEY, cur.join('\n'));
+            localStorage.setItem(NINJAGO_DICT_VERSION, '1');
+        } catch (e) {}
+    }
+
     window.onload = function() {
         domReady = true;
+        seedNinjagoDict(); // [תיקון 41]
         document.getElementById('correctionsInput').value = loadCorrectionsText(); // [תיקון 20]
         switchTab(localStorage.getItem('ninjagoTab') || 'project'); // [תיקון 22]
         populateProjectsList();
