@@ -611,6 +611,15 @@
                     <button class="btn-nav" onclick="previewSelectedClip()" style="margin-bottom: 15px; width: 100%;">▶️ נגן קטע נבחר לבדיקה</button>
                     
                     <input type="hidden" id="editSceneId" value="">
+                    <!-- [תיקון 39] חיתוך/איחוד לפי מילים (רק כשקובץ הכתוביות הוא ברמת מילה) -->
+                    <div id="wordSplitter" class="hidden" style="background:#e8f5e9; border:1px solid #a5d6a7; border-radius:8px; padding:8px 10px; margin-bottom:10px;">
+                        <div style="font-size:14px; color:#2e7d32; margin-bottom:6px;">✂️ לחץ על המספריים בין שתי מילים כדי לפצל את הסצנה שם. המילים של הסצנה לפי זמני הכתוביות:</div>
+                        <div id="wordSplitterWords" style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; direction:rtl; font-size:20px;"></div>
+                        <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                            <button class="btn-nav btn-small" onclick="mergeSceneWithNext()">⊕ אחד עם הסצנה הבאה</button>
+                            <button class="btn-nav btn-small" onclick="snapSceneToWords()">⌖ הצמד זמנים למילים</button>
+                        </div>
+                    </div>
                     <label>משפט לסצנה:</label>
                     <input type="text" id="sceneText" placeholder="למשל: שָׁלוֹם נוֹעַם!">
                     
@@ -913,13 +922,31 @@
                     const start = parseInt(timeMatch[1])*3600 + parseInt(timeMatch[2])*60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4])/1000;
                     const end = parseInt(timeMatch[5])*3600 + parseInt(timeMatch[6])*60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8])/1000;
                     let cleanText = textLines.replace(/<[^>]+>/g, '').replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').trim(); 
-                    if (cleanText.length > 1) { 
+                    // [תיקון 39] TurboScribe מפצל מילה עם גרש ("נינג" + "'ה") לשתי שורות: מדביקים בחזרה
+                    if (/^['׳’]/.test(cleanText) && clips.length) {
+                        const p = clips[clips.length - 1];
+                        p.text += cleanText; p.end = Math.max(p.end, end);
+                        return;
+                    }
+                    if (cleanText.length > 0) { 
                         clips.push({ start, end, text: cleanText });
                     }
                 }
             }
         });
         return clips;
+    }
+    // [תיקון 39] קובץ ברמת מילה (TurboScribe עם "1 מילה לקטע"): כמעט כל שורה היא מילה אחת
+    function isWordLevelSrt(clips) {
+        clips = clips || globalRawSrtClips;
+        if (!clips || clips.length < 20) return false;
+        const single = clips.filter(c => c.text.split(/\s+/).filter(Boolean).length === 1).length;
+        return single / clips.length > 0.9;
+    }
+    // המילים (עם זמנים) שנופלות בתוך טווח זמן של סצנה
+    function wordsInRange(start, end) {
+        if (!isWordLevelSrt()) return [];
+        return globalRawSrtClips.filter(c => (c.start + c.end) / 2 >= start && (c.start + c.end) / 2 <= end);
     }
 
     function shiftSrtTimes(amount) {
@@ -1290,6 +1317,29 @@
         });
         if (buf) { buf.complete = false; units.push(buf); } // סוף הקובץ בלי סימן סיום
 
+        // [תיקון 39] קובץ ברמת מילה: יחידה ארוכה מדי נחתכת בשקט הארוך ביותר שבתוכה (או אחרי פסיק+שקט),
+        // עד שכל החלקים באורך מתאים. חלק שנחתך בשקט ברור נחשב משפט שלם לצורך התרגיל.
+        if (isWordLevelSrt() && AG.join) {
+            const wordClips = globalRawSrtClips;
+            const splitUnit = (u) => {
+                const ws = wordClips.filter(c => c.start >= u.start - 0.01 && c.end <= u.end + 0.01);
+                const n = ws.length;
+                if (n <= MAX_WORDS || n < 4) return [u];
+                let best = -1, bestScore = -1;
+                for (let k = Math.max(1, MIN_WORDS - 1); k < n - Math.max(1, MIN_WORDS - 1); k++) {
+                    const g = ws[k].start - ws[k - 1].end;
+                    const comma = /[,;:]$/.test(ws[k - 1].text) ? 0.35 : 0;
+                    const score = g + comma;
+                    if (score > bestScore) { bestScore = score; best = k; }
+                }
+                if (best < 0 || bestScore < 0.18) return [u]; // אין שקט מספיק ברור: משאירים (ייפסל כארוך מדי)
+                const a = { start: ws[0].start, end: ws[best - 1].end, text: ws.slice(0, best).map(c => c.text).join(' '), complete: bestScore >= 0.4 || /[,;:]$/.test(ws[best - 1].text) };
+                const b = { start: ws[best].start, end: ws[n - 1].end, text: ws.slice(best).map(c => c.text).join(' '), complete: u.complete };
+                return splitUnit(a).concat(splitUnit(b));
+            };
+            units = units.flatMap(splitUnit);
+        }
+
         // שלב 2: בודקים אילו יחידות מתאימות למשחק
         const isGood = (u) => {
             if (!u.complete) return false;
@@ -1357,6 +1407,7 @@
         saveData();
         document.getElementById('sceneText').value = "";
         document.getElementById('editSceneId').value = "";
+        document.getElementById('wordSplitter').classList.add('hidden'); // [תיקון 39]
         document.getElementById('chkShowInGame').checked = false; 
     }
 
@@ -1421,6 +1472,7 @@
         document.getElementById({ typing: 'typeTyping', tracing: 'typeTracing', freewrite: 'typeFree', vector: 'typeVector' }[sceneType(s)]).checked = true;
         document.getElementById('chkShowInGame').checked = s.show;
         document.getElementById('editSceneId').value = s.id;
+        renderWordSplitter(s); // [תיקון 39]
         switchTab('manual'); // [תיקון 33] עוברים ישר למסך העריכה
         const tabsEl = document.getElementById('editTabs');
         if (tabsEl && tabsEl.scrollIntoView) tabsEl.scrollIntoView({ block: 'start' });
@@ -3244,6 +3296,81 @@
     })();
 
     // ================= [תיקון 33] כל הכתוביות: תיקון מילה במשפט בודד =================
+    // ================= [תיקון 39] חיתוך ואיחוד סצנות לפי מילים =================
+    const WORD_PAD_START = 0.25, WORD_PAD_END = 0.12;
+    function renderWordSplitter(s) {
+        const box = document.getElementById('wordSplitter');
+        const row = document.getElementById('wordSplitterWords');
+        const ws = wordsInRange(s.start, s.end);
+        if (ws.length < 2) { box.classList.add('hidden'); return; }
+        row.innerHTML = '';
+        ws.forEach((w, i) => {
+            const sp = document.createElement('span');
+            sp.textContent = w.text;
+            sp.style.cssText = 'background:#fff; border:1px solid #c8e6c9; border-radius:6px; padding:2px 8px;';
+            sp.title = formatTime(w.start);
+            sp.addEventListener('click', () => seekTo(Math.max(0, w.start)));
+            row.appendChild(sp);
+            if (i < ws.length - 1) {
+                const cut = document.createElement('button');
+                cut.textContent = '✂';
+                const gap = ws[i + 1].start - w.end;
+                cut.style.cssText = 'border:none; background:' + (gap > 0.4 ? '#ffcc80' : 'transparent') + '; color:#6d4c41; font-size:16px; padding:2px 4px; border-radius:50%; cursor:pointer; min-height:0;';
+                cut.title = 'פצל כאן (שקט ' + gap.toFixed(2) + ' ש\')';
+                cut.addEventListener('click', () => splitSceneAt(s.id, i));
+                row.appendChild(cut);
+            }
+        });
+        box.classList.remove('hidden');
+    }
+    function wordsText(ws) { return ws.map(w => w.text).join(' '); }
+    function splitSceneAt(id, k) {
+        const s = scenes.find(x => x.id === id);
+        if (!s) return;
+        const ws = wordsInRange(s.start, s.end);
+        if (k < 0 || k >= ws.length - 1) return;
+        const a = ws.slice(0, k + 1), b = ws.slice(k + 1);
+        const cutGap = b[0].start - a[a.length - 1].end;
+        const aEnd = a[a.length - 1].end + Math.min(WORD_PAD_END, cutGap / 2);
+        const bStart = b[0].start - Math.min(WORD_PAD_START, cutGap / 2);
+        const second = { id: Date.now() + Math.random(), start: bStart, end: s.end, text: wordsText(b), type: sceneType(s), tracing: sceneType(s) === 'tracing', show: s.show };
+        s.end = aEnd; s.text = wordsText(a);
+        const idx = scenes.indexOf(s);
+        scenes.splice(idx + 1, 0, second);
+        saveData();
+        editScene(s.id); // נשארים על החלק הראשון
+    }
+    function mergeSceneWithNext() {
+        const editId = parseFloat(document.getElementById('editSceneId').value);
+        const s = scenes.find(x => x.id === editId);
+        if (!s) return;
+        const later = scenes.filter(x => x.id !== s.id && x.start >= s.end - 0.05).sort((p, q) => p.start - q.start);
+        const n = later[0];
+        if (!n) { alert("אין סצנה אחרי הסצנה הזאת."); return; }
+        if (n.start - s.end > 3) { if (!confirm("הסצנה הבאה מתחילה " + (n.start - s.end).toFixed(1) + " שניות אחרי. לאחד בכל זאת?")) return; }
+        s.end = n.end;
+        const ws = wordsInRange(s.start, s.end);
+        s.text = ws.length ? wordsText(ws) : (s.text + ' ' + n.text);
+        scenes.splice(scenes.indexOf(n), 1);
+        saveData();
+        editScene(s.id);
+    }
+    function snapSceneToWords() {
+        const editId = parseFloat(document.getElementById('editSceneId').value);
+        const s = scenes.find(x => x.id === editId);
+        if (!s) return;
+        const ws = wordsInRange(s.start, s.end);
+        if (!ws.length) return;
+        const i0 = globalRawSrtClips.indexOf(ws[0]), i1 = globalRawSrtClips.indexOf(ws[ws.length - 1]);
+        const prevEnd = i0 > 0 ? globalRawSrtClips[i0 - 1].end : 0;
+        const nextStart = i1 < globalRawSrtClips.length - 1 ? globalRawSrtClips[i1 + 1].start : ws[ws.length - 1].end + 5;
+        s.start = ws[0].start - Math.max(0, Math.min(WORD_PAD_START, (ws[0].start - prevEnd) / 2));
+        s.end = ws[ws.length - 1].end + Math.max(0, Math.min(WORD_PAD_END, (nextStart - ws[ws.length - 1].end) / 2));
+        s.text = wordsText(ws);
+        saveData();
+        editScene(s.id);
+    }
+
     function renderAllSubtitles() {
         const box = document.getElementById('allSubsList');
         if (!box) return;
@@ -3422,6 +3549,9 @@
       { ch: 'ש', strokes: [
         [[8,60],[20,58],[33,55],[46,49],[57,41],[64,31],[64,20],[56,12],[44,9],[30,11],[18,18],[9,30],[5,44],[6,58],[9,70],[16,81],[27,88],[40,90],[52,86],[61,78],[65,70]]
       ]},
+      { ch: "'", strokes: [
+        [[6.0,-6.0],[5.2,-3.0],[4.4,0.0],[3.6,3.0],[2.8,6.0],[2.0,9.0]]
+      ]},
       { ch: 'ת', strokes: [
         [[26.6,16.0],[30.7,15.7],[34.9,15.5],[39.0,15.3],[43.1,15.2],[47.2,15.3],[51.4,15.8],[55.4,16.5],[59.4,17.6],[63.2,19.3],[66.7,21.5],[69.8,24.2],[72.4,27.4],[74.5,30.9],[76.1,34.8],[77.2,38.7],[77.9,42.8],[78.3,46.9],[78.4,51.1],[78.2,55.2],[77.9,59.3],[77.4,63.4],[76.7,67.5],[75.9,71.6],[75.1,75.6],[74.1,79.6],[72.9,83.6],[71.6,87.5]],
         [[23.0,11.4],[22.8,15.5],[22.7,19.6],[22.7,23.7],[22.7,27.8],[22.7,31.9],[22.7,36.0],[22.7,40.1],[22.7,44.3],[22.7,48.4],[22.7,52.5],[22.7,56.6],[22.7,60.7],[22.7,64.8],[22.6,68.9],[22.2,72.9],[21.5,77.0],[20.1,80.8],[17.8,84.2],[14.6,86.8],[10.9,88.5],[6.9,89.4],[2.8,89.7]]
@@ -3489,7 +3619,8 @@
 
     // מפרק משפט למילים, ומשאיר רק אותיות שיש להן מסלול (פיסוק, ניקוד וספרות לא מוצגים)
     function vfWordsOf(text) {
-        return String(text || '').split(/\s+/).map(w => Array.from(w).filter(ch => VF[ch]).map(ch => VF[ch])).filter(w => w.length);
+        // [תיקון 39] גרש בכל צורותיו הופך לגרש רגיל, שיש לו מסלול קצר משלו
+        return String(text || '').replace(/[׳’]/g, "'").split(/\s+/).map(w => Array.from(w).filter(ch => VF[ch]).map(ch => VF[ch])).filter(w => w.length);
     }
     function vfAreaHeight() { return Math.max(210, Math.min(300, Math.round(window.innerHeight * 0.38))); }
 
