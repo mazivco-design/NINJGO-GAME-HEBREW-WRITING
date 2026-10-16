@@ -528,6 +528,15 @@
                     <label style="display:block; margin-top:10px;">
                         <input type="checkbox" id="chkSelfVerify" style="transform: scale(1.5); margin-left: 10px;" onchange="saveSettingsIfProject()"> בדיקה עצמית בסוף כל תרגיל (הילד משווה למה שכתוב בכתובית הצרובה בסרטון)
                     </label>
+                    <!-- [תיקון 40] מהירות ניגון הסרטון במשחק -->
+                    <label style="display:block; margin-top:10px;">
+                        🐢 מהירות הסרטון במשחק:
+                        <select id="selGameSpeed" style="width:auto; margin-top:0; padding:6px 10px;" onchange="saveSettingsIfProject()">
+                            <option value="1">רגילה</option>
+                            <option value="0.75">איטית (75%)</option>
+                            <option value="0.5">איטית מאוד (50%)</option>
+                        </select>
+                    </label>
                 </div>
             </div>
 
@@ -675,7 +684,10 @@
                     </div>
 
                     <!-- [תיקון 36] הועבר מלשונית "מערכת" -->
-                    <div style="margin-bottom: 12px;"><button class="btn-danger btn-small" onclick="deleteAllScenesInProject()">מחק כל הסצנות 🗑️</button></div>
+                    <div style="margin-bottom: 12px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn-danger btn-small" onclick="deleteInactiveScenes()">מחק את הסצנות הכבויות 🗑️</button>
+                        <button class="btn-danger btn-small" onclick="deleteAllScenesInProject()">מחק כל הסצנות 🗑️</button>
+                    </div>
 
                     <label style="display:block; margin-bottom: 12px; cursor: pointer;"><input type="checkbox" id="chkOnlyReported" onchange="renderScenes()" style="transform: scale(1.4); margin-left: 8px;"> הצג רק סצנות שדווחו 🚩 <span id="reportedCount"></span></label>
 
@@ -1052,6 +1064,7 @@
         document.getElementById('chkBlockSubtitles').checked = true;
         document.getElementById('chkFullPlay').checked = false;
         document.getElementById('chkSelfVerify').checked = false;
+        document.getElementById('selGameSpeed').value = '1';
         
         srtFileInput.value = '';
         dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
@@ -1129,6 +1142,7 @@
             document.getElementById('chkBlockSubtitles').checked = true;
             document.getElementById('chkFullPlay').checked = false;
             document.getElementById('chkSelfVerify').checked = false;
+            document.getElementById('selGameSpeed').value = '1';
         } else {
             scenes = projData.scenes || [];
             currentVideoId = projData.videoId;
@@ -1138,6 +1152,7 @@
             document.getElementById('chkBlockSubtitles').checked = projData.blockSubtitles !== false;
             document.getElementById('chkFullPlay').checked = projData.fullPlay === true;
             document.getElementById('chkSelfVerify').checked = projData.selfVerify === true;
+            document.getElementById('selGameSpeed').value = String(projData.gameSpeed || 1);
         }
 
         // [תיקון 2] זוכרים שזה הפרויקט האחרון שנפתח, כדי לטעון אותו אוטומטית בפעם הבאה.
@@ -1195,7 +1210,8 @@
              document.getElementById('chkBlockSubtitles').checked = allData[currentProjectName].blockSubtitles !== false;
              document.getElementById('chkFullPlay').checked = allData[currentProjectName].fullPlay === true;
              document.getElementById('chkSelfVerify').checked = allData[currentProjectName].selfVerify === true;
-        } else { scenes = []; globalRawSrtClips = []; srtOffset = 0; updateSrtOffsetDisplay(); document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; document.getElementById('chkSelfVerify').checked = false; }
+             document.getElementById('selGameSpeed').value = String(allData[currentProjectName].gameSpeed || 1);
+        } else { scenes = []; globalRawSrtClips = []; srtOffset = 0; updateSrtOffsetDisplay(); document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; document.getElementById('chkSelfVerify').checked = false; document.getElementById('selGameSpeed').value = '1'; }
         
         saveData();
     }
@@ -1223,6 +1239,7 @@
     }
     
     function playVideo() {
+        if (typeof verifyScene === 'undefined' || !verifyScene) applyGameRate(); // [תיקון 40] המהירות של המשחק נשמרת גם אחרי טעינה מחדש של הנגן
         if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
         if (videoType === 'local') localElement.play();
     }
@@ -1429,7 +1446,8 @@
             srtOffset: srtOffset,
             blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
             fullPlay: document.getElementById('chkFullPlay').checked,
-            selfVerify: document.getElementById('chkSelfVerify').checked
+            selfVerify: document.getElementById('chkSelfVerify').checked,
+            gameSpeed: parseFloat(document.getElementById('selGameSpeed').value) || 1
         };
 
         if (currentProjectName && currentProjectName !== projName) { delete allData[currentProjectName]; }
@@ -1452,7 +1470,8 @@
             srtOffset: srtOffset,
             blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
             fullPlay: document.getElementById('chkFullPlay').checked,
-            selfVerify: document.getElementById('chkSelfVerify').checked
+            selfVerify: document.getElementById('chkSelfVerify').checked,
+            gameSpeed: parseFloat(document.getElementById('selGameSpeed').value) || 1
         };
         localStorage.setItem('ninjagoData', JSON.stringify(allData));
     }
@@ -1493,6 +1512,16 @@
     // עכשיו: נמחקות רק הסצנות. הסרטון, הכתוביות ושם הפרויקט נשארים,
     // כך אפשר ליצור סצנות מחדש בלי להעלות הכול שוב.
     // למחיקת פרויקט שלם קיים "איפוס מערכת".
+    // [תיקון 40] מוחק רק סצנות שלא פעילות במשחק
+    function deleteInactiveScenes() {
+        if (!currentProjectName) { alert("לא נבחר פרויקט."); return; }
+        const n = scenes.filter(s => !s.show).length;
+        if (!n) { alert("אין סצנות כבויות למחיקה."); return; }
+        openConfirmModal("מחיקת סצנות כבויות", "למחוק " + n + " סצנות כבויות? הסצנות הפעילות (" + (scenes.length - n) + ") יישארו.", () => {
+            scenes = scenes.filter(s => s.show);
+            saveData();
+        });
+    }
     function deleteAllScenesInProject() {
         if (!currentProjectName) { alert("לא נבחר פרויקט למחיקה."); return; }
         openConfirmModal("מחיקת סצנות", "האם למחוק את כל הסצנות בפרויקט '" + currentProjectName + "'? (הסרטון והכתוביות יישארו)", () => {
@@ -1606,7 +1635,7 @@
             document.getElementById('modeToggleBtn').innerText = "חזור לעריכה ⚙️";
             gamePlaceholder.appendChild(editVideoWrapper);
             
-            recreateYtPlayer(() => { setTimeout(startGame, 150); }); // [תיקון 36]
+            recreateYtPlayer(() => { applyGameRate(); setTimeout(startGame, 150); }); // [תיקון 36] [תיקון 40]
         } else {
             currentMode = 'edit';
             // [תיקון 19] עוצרים כל ניגון או המתנה שנשארו מהמשחק
@@ -1632,7 +1661,7 @@
             practice = null;
             document.getElementById('subtitleBlocker').style.display = 'none'; // תמיד כבוי בעריכה
             pauseVideo();
-            recreateYtPlayer(); // [תיקון 36] ההעברה בין המסכים טוענת את ה-iframe מחדש, אז מחזירים את הסרטון הנכון
+            recreateYtPlayer(() => applyGameRate()); // [תיקון 36] ההעברה בין המסכים טוענת את ה-iframe מחדש, אז מחזירים את הסרטון הנכון; [תיקון 40] ובעריכה המהירות חוזרת לרגיל
         }
     }
 
@@ -2878,6 +2907,9 @@
             if (currentMode === 'game') document.getElementById('subtitleBlocker').style.display = document.getElementById('chkBlockSubtitles').checked ? 'block' : 'none';
         }
     }
+    // [תיקון 40] המהירות הרגילה של הסרטון: במשחק לפי ההגדרה של הפרויקט, בעריכה תמיד 1
+    function gameRate() { return currentMode === 'game' ? (parseFloat(document.getElementById('selGameSpeed').value) || 1) : 1; }
+    function applyGameRate() { setRate(gameRate()); }
     // [תיקון 38] לולאת בדיקה: הסצנה חוזרת על עצמה בחצי מהירות. בלי קול השמע מושתק; עם קול המהירות רגילה.
     let verifyLoopTimer = null, verifySound = false;
     const VERIFY_RATE = 0.5, VERIFY_PRE = 0.3, VERIFY_POST = 0.4;
@@ -2895,7 +2927,7 @@
         fullPlayAfter = null; fullPlayTarget = null;
         const from = Math.max(0, s.start - VERIFY_PRE), to = s.end + VERIFY_POST;
         setMuted(!verifySound);
-        setRate(verifySound ? 1 : VERIFY_RATE);
+        setRate(verifySound ? gameRate() : Math.min(VERIFY_RATE, gameRate()));
         seekTo(from); playVideo();
         verifyLoopTimer = setInterval(() => {
             if (!verifyScene) { stopVerifyPlayback(); return; }
@@ -2907,7 +2939,7 @@
         if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
         fullPlayAfter = null; fullPlayTarget = null;
         pauseVideo();
-        setRate(1);
+        applyGameRate();
         setMuted(false);
     }
     document.getElementById('btnVerifyReplay').addEventListener('click', () => {
@@ -3421,10 +3453,12 @@
 
     // ================= [תיקון 33] הגדרות יצירת סצנות אוטומטית =================
     const AUTOGEN_KEY = 'ninjagoAutogen';
-    const AUTOGEN_DEFAULTS = { minWords: 3, maxWords: 8, minSec: 0, maxSec: 6, padStart: 0.3, padEnd: 0.12, maxGap: 1.5, join: true, type: 'tracing', show: false };
+    const AUTOGEN_DEFAULTS = { minWords: 4, maxWords: 6, minSec: 0, maxSec: 6, padStart: 0.3, padEnd: 0.12, maxGap: 0.6, join: true, type: 'tracing', show: false }; // [תיקון 40] ברירות מחדל מותאמות לקובץ ברמת מילה
     function loadAutogenRaw() {
         let o = {};
         try { o = JSON.parse(localStorage.getItem(AUTOGEN_KEY) || '{}') || {}; } catch (e) { o = {}; }
+        // [תיקון 40] מי שעדיין עם ברירות המחדל הישנות (3/8/1.5) עובר אוטומטית לחדשות
+        if (o.minWords === 3 && o.maxWords === 8 && o.maxGap === 1.5) { delete o.minWords; delete o.maxWords; delete o.maxGap; }
         return Object.assign({}, AUTOGEN_DEFAULTS, o);
     }
     function getAutogenSettings() {
