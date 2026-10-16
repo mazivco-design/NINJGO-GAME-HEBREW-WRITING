@@ -528,13 +528,14 @@
                     <label style="display:block; margin-top:10px;">
                         <input type="checkbox" id="chkSelfVerify" style="transform: scale(1.5); margin-left: 10px;" onchange="saveSettingsIfProject()"> בדיקה עצמית בסוף כל תרגיל (הילד משווה למה שכתוב בכתובית הצרובה בסרטון)
                     </label>
-                    <!-- [תיקון 40] מהירות ניגון הסרטון במשחק -->
+                    <!-- [תיקון 40] מהירות הסרטון בלולאת הבדיקה העצמית -->
                     <label style="display:block; margin-top:10px;">
-                        🐢 מהירות הסרטון במשחק:
+                        🐢 מהירות הסרטון בבדיקה העצמית:
                         <select id="selGameSpeed" style="width:auto; margin-top:0; padding:6px 10px;" onchange="saveSettingsIfProject()">
                             <option value="1">רגילה</option>
                             <option value="0.75">איטית (75%)</option>
-                            <option value="0.5">איטית מאוד (50%)</option>
+                            <option value="0.5" selected>איטית מאוד (50%)</option>
+                            <option value="0.25">הכי איטי (25%)</option>
                         </select>
                     </label>
                 </div>
@@ -1064,7 +1065,7 @@
         document.getElementById('chkBlockSubtitles').checked = true;
         document.getElementById('chkFullPlay').checked = false;
         document.getElementById('chkSelfVerify').checked = false;
-        document.getElementById('selGameSpeed').value = '1';
+        document.getElementById('selGameSpeed').value = '0.5';
         
         srtFileInput.value = '';
         dropZoneText.innerText = "גרור קובץ או לחץ לבחירה 📁";
@@ -1142,7 +1143,7 @@
             document.getElementById('chkBlockSubtitles').checked = true;
             document.getElementById('chkFullPlay').checked = false;
             document.getElementById('chkSelfVerify').checked = false;
-            document.getElementById('selGameSpeed').value = '1';
+            document.getElementById('selGameSpeed').value = '0.5';
         } else {
             scenes = projData.scenes || [];
             currentVideoId = projData.videoId;
@@ -1152,7 +1153,7 @@
             document.getElementById('chkBlockSubtitles').checked = projData.blockSubtitles !== false;
             document.getElementById('chkFullPlay').checked = projData.fullPlay === true;
             document.getElementById('chkSelfVerify').checked = projData.selfVerify === true;
-            document.getElementById('selGameSpeed').value = String(projData.gameSpeed || 1);
+            document.getElementById('selGameSpeed').value = String(projData.gameSpeed || 0.5);
         }
 
         // [תיקון 2] זוכרים שזה הפרויקט האחרון שנפתח, כדי לטעון אותו אוטומטית בפעם הבאה.
@@ -1210,8 +1211,8 @@
              document.getElementById('chkBlockSubtitles').checked = allData[currentProjectName].blockSubtitles !== false;
              document.getElementById('chkFullPlay').checked = allData[currentProjectName].fullPlay === true;
              document.getElementById('chkSelfVerify').checked = allData[currentProjectName].selfVerify === true;
-             document.getElementById('selGameSpeed').value = String(allData[currentProjectName].gameSpeed || 1);
-        } else { scenes = []; globalRawSrtClips = []; srtOffset = 0; updateSrtOffsetDisplay(); document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; document.getElementById('chkSelfVerify').checked = false; document.getElementById('selGameSpeed').value = '1'; }
+             document.getElementById('selGameSpeed').value = String(allData[currentProjectName].gameSpeed || 0.5);
+        } else { scenes = []; globalRawSrtClips = []; srtOffset = 0; updateSrtOffsetDisplay(); document.getElementById('chkBlockSubtitles').checked = true; document.getElementById('chkFullPlay').checked = false; document.getElementById('chkSelfVerify').checked = false; document.getElementById('selGameSpeed').value = '0.5'; }
         
         saveData();
     }
@@ -1447,7 +1448,7 @@
             blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
             fullPlay: document.getElementById('chkFullPlay').checked,
             selfVerify: document.getElementById('chkSelfVerify').checked,
-            gameSpeed: parseFloat(document.getElementById('selGameSpeed').value) || 1
+            gameSpeed: parseFloat(document.getElementById('selGameSpeed').value) || 0.5
         };
 
         if (currentProjectName && currentProjectName !== projName) { delete allData[currentProjectName]; }
@@ -1471,7 +1472,7 @@
             blockSubtitles: document.getElementById('chkBlockSubtitles').checked,
             fullPlay: document.getElementById('chkFullPlay').checked,
             selfVerify: document.getElementById('chkSelfVerify').checked,
-            gameSpeed: parseFloat(document.getElementById('selGameSpeed').value) || 1
+            gameSpeed: parseFloat(document.getElementById('selGameSpeed').value) || 0.5
         };
         localStorage.setItem('ninjagoData', JSON.stringify(allData));
     }
@@ -2907,12 +2908,12 @@
             if (currentMode === 'game') document.getElementById('subtitleBlocker').style.display = document.getElementById('chkBlockSubtitles').checked ? 'block' : 'none';
         }
     }
-    // [תיקון 40] המהירות הרגילה של הסרטון: במשחק לפי ההגדרה של הפרויקט, בעריכה תמיד 1
-    function gameRate() { return currentMode === 'game' ? (parseFloat(document.getElementById('selGameSpeed').value) || 1) : 1; }
-    function applyGameRate() { setRate(gameRate()); }
+    // [תיקון 40] מהירות הסרטון בלולאת הבדיקה העצמית (הגדרה של הפרויקט). בכל שאר הזמן המהירות רגילה.
+    function verifyRate() { return parseFloat(document.getElementById('selGameSpeed').value) || 0.5; }
+    function applyGameRate() { setRate(1); }
     // [תיקון 38] לולאת בדיקה: הסצנה חוזרת על עצמה בחצי מהירות. בלי קול השמע מושתק; עם קול המהירות רגילה.
     let verifyLoopTimer = null, verifySound = false;
-    const VERIFY_RATE = 0.5, VERIFY_PRE = 0.3, VERIFY_POST = 0.4;
+    const VERIFY_PRE = 0.3, VERIFY_POST = 0.4;
     function setRate(r) {
         if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.setPlaybackRate === 'function') { try { ytPlayer.setPlaybackRate(r); } catch (e) {} }
         if (videoType === 'local') localElement.playbackRate = r;
@@ -2927,7 +2928,7 @@
         fullPlayAfter = null; fullPlayTarget = null;
         const from = Math.max(0, s.start - VERIFY_PRE), to = s.end + VERIFY_POST;
         setMuted(!verifySound);
-        setRate(verifySound ? gameRate() : Math.min(VERIFY_RATE, gameRate()));
+        setRate(verifySound ? 1 : verifyRate());
         seekTo(from); playVideo();
         verifyLoopTimer = setInterval(() => {
             if (!verifyScene) { stopVerifyPlayback(); return; }
