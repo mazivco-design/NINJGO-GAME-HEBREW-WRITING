@@ -750,7 +750,7 @@
         <div id="verifyPanel" class="hidden">
             <button class="btn-success game-btn" id="btnVerifyOk">✔ זה זהה</button>
             <div class="sc-text" id="verifyText" style="font-size: clamp(18px, 2.6vw, 28px);">השווה את מה שכתבת לכתובית בסרטון</div>
-            <button class="btn-nav game-btn" id="btnVerifyReplay">▶ הראה שוב</button>
+            <button class="btn-nav game-btn" id="btnVerifyReplay">🔊 עם קול</button>
             <button class="btn-danger game-btn" id="btnVerifyDiff">✘ יש הבדל</button>
         </div>
 
@@ -1576,6 +1576,7 @@
             document.getElementById('editVideoSlot').appendChild(editVideoWrapper); // [תיקון 22] הסרטון חוזר לעמודה השמאלית
             hideSelfCheck();
             vfStop(); // [תיקון 34]
+            if (verifyScene) { stopVerifyPlayback(); hideVerify(); } // [תיקון 38]
             practice = null;
             document.getElementById('subtitleBlocker').style.display = 'none'; // תמיד כבוי בעריכה
             pauseVideo();
@@ -2810,7 +2811,10 @@
         document.getElementById('subtitleBlocker').style.display = 'none';
         if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
         fullPlayAfter = null; fullPlayTarget = null;
-        seekTo(verifyMidTime(scene)); playVideo(); setTimeout(pauseVideo, 500); // מציגים פריים עם הכתובית
+        // [תיקון 38] במקום פריים קפוא (שמעליו יוטיוב מציג "More videos"), הסצנה מתנגנת בלולאה, לאט ובלי קול
+        verifySound = false;
+        document.getElementById('btnVerifyReplay').textContent = '🔊 עם קול';
+        startVerifyLoop(scene);
         document.getElementById('verifyPanel').classList.remove('hidden');
         layoutGame();
     }
@@ -2822,15 +2826,44 @@
             if (currentMode === 'game') document.getElementById('subtitleBlocker').style.display = document.getElementById('chkBlockSubtitles').checked ? 'block' : 'none';
         }
     }
+    // [תיקון 38] לולאת בדיקה: הסצנה חוזרת על עצמה בחצי מהירות. בלי קול השמע מושתק; עם קול המהירות רגילה.
+    let verifyLoopTimer = null, verifySound = false;
+    const VERIFY_RATE = 0.5, VERIFY_PRE = 0.3, VERIFY_POST = 0.4;
+    function setRate(r) {
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.setPlaybackRate === 'function') { try { ytPlayer.setPlaybackRate(r); } catch (e) {} }
+        if (videoType === 'local') localElement.playbackRate = r;
+    }
+    function setMuted(m) {
+        if (videoType === 'youtube' && ytPlayer && typeof ytPlayer.mute === 'function') { if (m) ytPlayer.mute(); else { ytPlayer.unMute(); ytPlayer.setVolume(100); } }
+        if (videoType === 'local') localElement.muted = m;
+    }
+    function startVerifyLoop(s) {
+        if (verifyLoopTimer) { clearInterval(verifyLoopTimer); verifyLoopTimer = null; }
+        if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
+        fullPlayAfter = null; fullPlayTarget = null;
+        const from = Math.max(0, s.start - VERIFY_PRE), to = s.end + VERIFY_POST;
+        setMuted(!verifySound);
+        setRate(verifySound ? 1 : VERIFY_RATE);
+        seekTo(from); playVideo();
+        verifyLoopTimer = setInterval(() => {
+            if (!verifyScene) { stopVerifyPlayback(); return; }
+            if (getCurrentTime() >= to) { seekTo(from); playVideo(); }
+        }, 100);
+    }
     function stopVerifyPlayback() {
+        if (verifyLoopTimer) { clearInterval(verifyLoopTimer); verifyLoopTimer = null; }
         if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
         fullPlayAfter = null; fullPlayTarget = null;
         pauseVideo();
+        setRate(1);
+        setMuted(false);
     }
     document.getElementById('btnVerifyReplay').addEventListener('click', () => {
         const s = verifyScene;
         if (!s) return;
-        playUntil(s.start, s.end, () => { seekTo(verifyMidTime(s)); playVideo(); setTimeout(pauseVideo, 300); });
+        verifySound = !verifySound;
+        document.getElementById('btnVerifyReplay').textContent = verifySound ? '🔇 בלי קול' : '🔊 עם קול';
+        startVerifyLoop(s);
     });
     document.getElementById('btnVerifyOk').addEventListener('click', () => {
         const s = verifyScene;
