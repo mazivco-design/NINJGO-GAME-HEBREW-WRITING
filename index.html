@@ -2651,12 +2651,33 @@
             alert('נוסף למילון: ' + oldCore + ' = ' + nv + '. תוקנו ' + total + ' מקומות (בכתוביות ובסצנות).');
             return;
         }
-        // רק כאן
+        // רק כאן: במקום הזה בסרטון, כלומר גם בכתובית וגם בסצנה שחופפת לה בזמן
         const words = wordFix.text.split(/\s+/).filter(Boolean);
         if (nv === '') words.splice(wordFix.wi, 1); else words[wordFix.wi] = nv + (nv.match(/[.,!?;:"]$/) ? '' : punct);
         const newText = words.join(' ');
-        if (wordFix.kind === 'scene') { const sc = scenes.find(x => x.id === wordFix.ref); if (sc) sc.text = newText; }
-        else { const c = globalRawSrtClips[wordFix.ref]; if (c) c.text = newText; }
+        const replaceWordOnce = (text) => {
+            // מחליפים את המופע הראשון של המילה השגויה (מילה שלמה) בטקסט החופף
+            const re = new RegExp('(^|[^\\u05D0-\\u05EA])' + escapeRegex(oldCore) + '(?=[^\\u05D0-\\u05EA]|$)');
+            if (!re.test(text)) return null;
+            return nv === '' ? text.replace(re, '$1').replace(/\s{2,}/g, ' ').trim() : text.replace(re, '$1' + nv);
+        };
+        if (wordFix.kind === 'scene') {
+            const sc = scenes.find(x => x.id === wordFix.ref);
+            if (sc) sc.text = newText;
+            // [תיקון 43] גם הכתוביות באותו טווח זמן
+            globalRawSrtClips.forEach(c => {
+                if (c.end < wordFix.start - 0.05 || c.start > wordFix.end + 0.05) return;
+                const t = replaceWordOnce(c.text); if (t !== null) c.text = t;
+            });
+        } else {
+            const c = globalRawSrtClips[wordFix.ref];
+            if (c) c.text = newText;
+            // [תיקון 43] גם הסצנות שחופפות לכתובית הזאת
+            scenes.forEach(sc => {
+                if (sc.end < wordFix.start - 0.05 || sc.start > wordFix.end + 0.05) return;
+                const t = replaceWordOnce(sc.text); if (t !== null) sc.text = t;
+            });
+        }
         saveData();
         closeWordFix();
         const box = document.getElementById('allSubsList');
