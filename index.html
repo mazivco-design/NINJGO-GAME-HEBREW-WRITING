@@ -293,7 +293,7 @@
         /* [תיקון 13] תיבת הרמז */
         #hintBox { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; background: #fffde7; border: 3px solid #ffb300; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10px; font-family: Arial, sans-serif; font-size: clamp(32px, 6vw, 56px); font-weight: bold; color: #1565c0; }
         /* [תיקון 18] חלונות דיווח על טעות וסקירת סצנות */
-        #reportModal, #reviewModal {
+        #reportModal, #reviewModal, #wordFixModal {
             display: none;
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); z-index: 9999;
@@ -412,6 +412,28 @@
             <button class="btn-success" id="btnReportWithText" style="font-size:20px;"></button>
             <button class="btn-action" id="btnReportPlain" style="font-size:20px;">דווח על הטעות</button>
             <button class="btn-nav" id="btnReportCancel" style="background:#e0e0e0; font-size:20px;">ביטול</button>
+        </div>
+    </div>
+</div>
+
+<!-- [תיקון 42] תיקון מילה: במקום אחד או בכל מקום (דרך המילון) -->
+<div id="wordFixModal">
+    <div class="confirm-box" style="max-width: 520px; text-align: right;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+            <h3 style="margin:0;">✏️ תיקון מילה</h3>
+            <button class="btn-nav btn-small" onclick="closeWordFix()">✖ סגור</button>
+        </div>
+        <div id="wordFixContext" style="color:#607d8b; font-size:16px; margin-bottom:8px; line-height:1.5;"></div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <span style="font-size:20px; background:#ffebee; padding:4px 10px; border-radius:6px;" id="wordFixOld"></span>
+            <span style="font-size:22px;">←</span>
+            <input type="text" id="wordFixNew" style="flex:1; min-width:140px; font-size:22px; direction:rtl; margin-top:0;" placeholder="המילה הנכונה">
+        </div>
+        <div id="wordFixNote" style="margin-top:6px; font-size:15px; color:#e65100; min-height:20px;"></div>
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+            <button class="btn-action" onclick="wordFixPlay()">▶ נגן</button>
+            <button class="btn-success" onclick="applyWordFix(false)">תקן כאן בלבד</button>
+            <button class="btn-success" style="background:#1565c0;" onclick="applyWordFix(true)">תקן בכל מקום 📖</button>
         </div>
     </div>
 </div>
@@ -1571,7 +1593,7 @@
             li.innerHTML = `<div style="display: flex; justify-content: space-between; align-items: start;">
                                 <div>
                                     <strong>סצנה ${i+1}:</strong> ${formatTimePrecise(s.start)} - ${formatTimePrecise(s.end)}<br> 
-                                    "${escapeHtml(s.text)}" <br> 
+                                    <span class="scene-words" style="font-size:18px;">${sceneWordsHtml(s)}</span> <br> 
                                     <select onchange="setSceneTypeById(${s.id}, this.value)" style="width:auto; margin-top:2px; padding:3px 6px; font-size:14px;">${typeOptionsHtml(sceneType(s))}</select>
                                     ${reportHtml}
                                 </div>
@@ -2567,6 +2589,83 @@
             }
         }, 80);
     }
+    // ================= [תיקון 42] תיקון מילה מהסצנה / מהכתוביות =================
+    const COMMON_SHORT = new Set(['את','של','על','לא','זה','אם','כל','הם','הן','מה','מי','כי','גם','או','עם','אל','יש','אין','רק','כן','אז','פה','שם','הוא','היא','אני','אתה','לי','לך','לו','לה','בו','בה','כך','כבר','עוד','אבל','אולי','כמו','מאוד','הכל','בוא','טוב','קול','וו','ביט']);
+    let wordFix = null; // { kind:'scene'|'clip', id|ci, wi, old, start, end, text }
+    function sceneWordsHtml(s) {
+        const words = s.text.split(/\s+/).filter(Boolean);
+        return '"' + words.map((w, wi) => '<span class="sub-word" onclick="openWordFix(\'scene\',' + s.id + ',' + wi + ')">' + escapeHtml(w) + '</span>').join(' ') + '"';
+    }
+    function openWordFix(kind, ref, wi) {
+        let text, start, end;
+        if (kind === 'scene') { const sc = scenes.find(x => x.id === ref); if (!sc) return; text = sc.text; start = sc.start; end = sc.end; }
+        else { const c = globalRawSrtClips[ref]; if (!c) return; text = c.text; start = c.start; end = c.end; }
+        const words = text.split(/\s+/).filter(Boolean);
+        const old = words[wi];
+        if (!old) return;
+        wordFix = { kind: kind, ref: ref, wi: wi, old: old, start: start, end: end, text: text };
+        document.getElementById('wordFixOld').textContent = old;
+        document.getElementById('wordFixContext').innerHTML = words.map((w, i) => i === wi ? '<b style="color:#c62828;">' + escapeHtml(w) + '</b>' : escapeHtml(w)).join(' ');
+        const inp = document.getElementById('wordFixNew');
+        inp.value = old.replace(/[.,!?;:"]+$/, '');
+        const core = inp.value;
+        const inDict = parseCorrections(loadCorrectionsText()).find(p => p[0] === core);
+        const note = document.getElementById('wordFixNote');
+        if (inDict) note.textContent = 'כבר במילון: ' + inDict[0] + ' = ' + inDict[1];
+        else if (core.length <= 2 || COMMON_SHORT.has(core)) note.textContent = '⚠️ מילה קצרה/נפוצה. "תקן בכל מקום" עלול לפגוע במשפטים אחרים.';
+        else note.textContent = '';
+        document.getElementById('wordFixModal').style.display = 'flex';
+        setTimeout(() => { inp.focus(); inp.select(); }, 50);
+    }
+    function closeWordFix() { document.getElementById('wordFixModal').style.display = 'none'; wordFix = null; }
+    function wordFixPlay() {
+        if (!wordFix) return;
+        let from = wordFix.start, to = wordFix.end;
+        // בקובץ ברמת מילה: מנגנים מעט לפני המילה עצמה
+        if (wordFix.kind === 'scene' && isWordLevelSrt()) {
+            const ws = wordsInRange(wordFix.start, wordFix.end);
+            const w = ws[wordFix.wi];
+            if (w) { from = Math.max(0, w.start - 1.0); to = Math.min(wordFix.end, w.end + 1.0); }
+        } else if (wordFix.kind === 'clip') { from = Math.max(0, from - 0.8); to = to + 0.8; }
+        playRange(from, to);
+    }
+    function applyWordFix(everywhere) {
+        if (!wordFix) return;
+        const nv = document.getElementById('wordFixNew').value.trim();
+        const oldCore = wordFix.old.replace(/[.,!?;:"]+$/, '');
+        const punct = wordFix.old.slice(oldCore.length);
+        if (everywhere) {
+            if (!nv) { alert('כדי לתקן בכל מקום צריך מילה נכונה (למחיקה השתמש ב"תקן כאן בלבד").'); return; }
+            if (nv === oldCore) { alert('המילה לא השתנתה.'); return; }
+            const lines = loadCorrectionsText().split('\n').map(x => x.trim()).filter(Boolean).filter(l => l.startsWith('#') || l.split('=')[0].trim() !== oldCore);
+            lines.push(oldCore + '=' + nv);
+            localStorage.setItem(CORRECTIONS_KEY, lines.join('\n'));
+            document.getElementById('correctionsInput').value = lines.join('\n');
+            const pairs = [[oldCore, nv]];
+            let total = 0;
+            globalRawSrtClips.forEach(c => { const r = applyCorrectionsToText(c.text, pairs); c.text = r.text; total += r.count; });
+            scenes.forEach(sc => { const r = applyCorrectionsToText(sc.text, pairs); sc.text = r.text; total += r.count; });
+            saveData();
+            closeWordFix();
+            renderAllSubtitles();
+            alert('נוסף למילון: ' + oldCore + ' = ' + nv + '. תוקנו ' + total + ' מקומות (בכתוביות ובסצנות).');
+            return;
+        }
+        // רק כאן
+        const words = wordFix.text.split(/\s+/).filter(Boolean);
+        if (nv === '') words.splice(wordFix.wi, 1); else words[wordFix.wi] = nv + (nv.match(/[.,!?;:"]$/) ? '' : punct);
+        const newText = words.join(' ');
+        if (wordFix.kind === 'scene') { const sc = scenes.find(x => x.id === wordFix.ref); if (sc) sc.text = newText; }
+        else { const c = globalRawSrtClips[wordFix.ref]; if (c) c.text = newText; }
+        saveData();
+        closeWordFix();
+        const box = document.getElementById('allSubsList');
+        const top = box ? box.scrollTop : 0;
+        renderAllSubtitles();
+        if (box) box.scrollTop = top;
+    }
+    document.getElementById('wordFixNew').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyWordFix(false); } });
+
     function previewScene(id) {
         const s = scenes.find(x => x.id === id);
         if (s) playRange(s.start, s.end);
@@ -3429,7 +3528,7 @@
                 const sp = document.createElement('span');
                 sp.className = 'sub-word';
                 sp.textContent = w;
-                sp.addEventListener('click', () => editSubtitleWord(ci, wi));
+                sp.addEventListener('click', () => openWordFix('clip', ci, wi)); // [תיקון 42]
                 row.appendChild(sp);
                 row.appendChild(document.createTextNode(' '));
             });
