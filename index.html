@@ -429,9 +429,11 @@
             <span style="font-size:22px;">←</span>
             <input type="text" id="wordFixNew" style="flex:1; min-width:140px; font-size:22px; direction:rtl; margin-top:0;" placeholder="המילה הנכונה">
         </div>
+        <div style="font-size:13px; color:#78909c; margin-top:4px;">אפשר להקליד כמה מילים (למשל כדי להוסיף מילה חסרה), או להשאיר ריק כדי למחוק את המילה.</div>
         <div id="wordFixNote" style="margin-top:6px; font-size:15px; color:#e65100; min-height:20px;"></div>
         <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
             <button class="btn-action" onclick="wordFixPlay()">▶ נגן</button>
+            <button class="btn-nav" id="btnWordJoin" onclick="wordFixJoinNext()">⊕ חבר עם המילה הבאה</button>
             <button class="btn-success" onclick="applyWordFix(false)">תקן כאן בלבד</button>
             <button class="btn-success" style="background:#1565c0;" onclick="applyWordFix(true)">תקן בכל מקום 📖</button>
         </div>
@@ -2618,6 +2620,49 @@
         setTimeout(() => { inp.focus(); inp.select(); }, 50);
     }
     function closeWordFix() { document.getElementById('wordFixModal').style.display = 'none'; wordFix = null; }
+    // [תיקון 44] בקובץ ברמת מילה: החלפת טקסט של כתובית. כמה מילים -> הכתובית מתפצלת לכמה, והזמן מתחלק לפי אורך המילים
+    function setClipText(ci, newText) {
+        const c = globalRawSrtClips[ci];
+        if (!c) return;
+        const words = newText.split(/\s+/).filter(Boolean);
+        if (!words.length) { globalRawSrtClips.splice(ci, 1); return; }
+        if (words.length === 1 || !isWordLevelSrt()) { c.text = newText.trim(); return; }
+        const total = words.reduce((a, w) => a + w.length, 0), dur = c.end - c.start;
+        let t = c.start;
+        const parts = words.map(w => { const d = dur * w.length / total; const p = { start: t, end: t + d, text: w }; t += d; return p; });
+        globalRawSrtClips.splice(ci, 1, ...parts);
+    }
+    // הכתוביות (ברמת מילה) שמתאימות למילה ה-wi בסצנה; מחזיר אינדקס או -1
+    function clipIndexForSceneWord(sc, wi) {
+        if (!isWordLevelSrt()) return -1;
+        const ws = wordsInRange(sc.start, sc.end);
+        const sw = sc.text.split(/\s+/).filter(Boolean);
+        if (ws.length === sw.length) return globalRawSrtClips.indexOf(ws[wi]);
+        const core = (sw[wi] || '').replace(/[.,!?;:"]+$/, '');
+        const hit = ws.find(c => c.text.replace(/[.,!?;:"]+$/, '') === core);
+        return hit ? globalRawSrtClips.indexOf(hit) : -1;
+    }
+    // [תיקון 44] מחבר את המילה עם הבאה אחריה (למשל "ל" + "צ'ן" -> "לצ'ן"), בכתוביות ובסצנה
+    function wordFixJoinNext() {
+        if (!wordFix) return;
+        let ci = -1;
+        if (wordFix.kind === 'clip') ci = wordFix.ref;
+        else { const sc = scenes.find(x => x.id === wordFix.ref); if (sc) ci = clipIndexForSceneWord(sc, wordFix.wi); }
+        const a = globalRawSrtClips[ci], b = globalRawSrtClips[ci + 1];
+        if (!a || !b) { alert('אין מילה אחרי המילה הזאת בכתוביות.'); return; }
+        const joined = a.text.replace(/[.,!?;:"]+$/, '') + b.text;
+        // הסצנות שחופפות: "א ב" -> "אב"
+        const re = new RegExp('(^|[^\\u05D0-\\u05EA])' + escapeRegex(a.text) + '\\s+' + escapeRegex(b.text) + '(?=[^\\u05D0-\\u05EA]|$)');
+        scenes.forEach(sc => { if (sc.end >= a.start - 0.05 && sc.start <= b.end + 0.05 && re.test(sc.text)) sc.text = sc.text.replace(re, '$1' + joined); });
+        a.text = joined; a.end = b.end;
+        globalRawSrtClips.splice(ci + 1, 1);
+        saveData();
+        closeWordFix();
+        const box = document.getElementById('allSubsList');
+        const top = box ? box.scrollTop : 0;
+        renderAllSubtitles();
+        if (box) box.scrollTop = top;
+    }
     function wordFixPlay() {
         if (!wordFix) return;
         let from = wordFix.start, to = wordFix.end;
@@ -2637,6 +2682,7 @@
         if (everywhere) {
             if (!nv) { alert('כדי לתקן בכל מקום צריך מילה נכונה (למחיקה השתמש ב"תקן כאן בלבד").'); return; }
             if (nv === oldCore) { alert('המילה לא השתנתה.'); return; }
+            if (/\s/.test(nv) && !confirm('התיקון מכיל כמה מילים. "בכל מקום" יחליף את "' + oldCore + '" ב-"' + nv + '" בכל הפרויקטים. אם רק כאן חסרה מילה, עדיף "תקן כאן בלבד". להמשיך בכל זאת?')) return;
             const lines = loadCorrectionsText().split('\n').map(x => x.trim()).filter(Boolean).filter(l => l.startsWith('#') || l.split('=')[0].trim() !== oldCore);
             lines.push(oldCore + '=' + nv);
             localStorage.setItem(CORRECTIONS_KEY, lines.join('\n'));
@@ -2663,15 +2709,17 @@
         };
         if (wordFix.kind === 'scene') {
             const sc = scenes.find(x => x.id === wordFix.ref);
-            if (sc) sc.text = newText;
-            // [תיקון 43] גם הכתוביות באותו טווח זמן
-            globalRawSrtClips.forEach(c => {
-                if (c.end < wordFix.start - 0.05 || c.start > wordFix.end + 0.05) return;
-                const t = replaceWordOnce(c.text); if (t !== null) c.text = t;
-            });
+            if (sc) {
+                const ci = clipIndexForSceneWord(sc, wordFix.wi); // [תיקון 44] קובץ ברמת מילה: אותה כתובית, כולל פיצול
+                sc.text = newText;
+                if (ci >= 0) setClipText(ci, nv === '' ? '' : nv + (globalRawSrtClips[ci].text.match(/[.,!?;:"]+$/) || [''])[0]);
+                else globalRawSrtClips.forEach(c => { // [תיקון 43] קובץ רגיל: הכתוביות באותו טווח זמן
+                    if (c.end < wordFix.start - 0.05 || c.start > wordFix.end + 0.05) return;
+                    const t = replaceWordOnce(c.text); if (t !== null) c.text = t;
+                });
+            }
         } else {
-            const c = globalRawSrtClips[wordFix.ref];
-            if (c) c.text = newText;
+            setClipText(wordFix.ref, newText); // [תיקון 44]
             // [תיקון 43] גם הסצנות שחופפות לכתובית הזאת
             scenes.forEach(sc => {
                 if (sc.end < wordFix.start - 0.05 || sc.start > wordFix.end + 0.05) return;
